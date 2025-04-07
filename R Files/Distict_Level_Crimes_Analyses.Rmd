@@ -1,0 +1,224 @@
+---
+title: "Distict_Level_Crimes_Analyses"
+output: html_document
+date: "2025-03-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+
+options(scipen = 999)
+```
+
+```{r}
+#load in Crime Dataset from 2010-Present
+Crimes_2010_to_Present <- read_csv("~/2025 Spring/Thesis/Cleaned Data/Crimes_-_2010_to_Present_20241114.csv")
+
+#load in IUCR Codes Dataset
+IUCR_Codes <- read.csv("~/2025 Spring/Thesis/Raw Data/Chicago_Police_Department_-_Illinois_Uniform_Crime_Reporting__IUCR__Codes_20250306.csv")
+```
+
+```{r}
+#Add a Boolean that signifies if the reported incident was a violent crime
+Crimes_2010_Present <- left_join(Crimes_2010_Present, IUCR_Codes, by = "IUCR")
+Crimes_2010_Present$Violent.y <- replace(Crimes_2010_Present$Violent, is.na(Crimes_2010_Present$Violent), 0)
+
+Crimes_2010_Present <- Crimes_2010_Present |> filter(Year <= 2020)
+```
+
+--------------------------------------------------------------------------------
+#District Breakdown
+
+```{r}
+District_Crime_Level_Year <- Crimes_2010_Present |>
+  group_by(District, Year) |>
+  summarise(Total_Crime = n(),
+            Violent = sum(Violent.y == 1, na.rm = TRUE),
+            Arrests = sum(Arrest == 'false', na.rm = TRUE),
+            Crime_to_Arrest_Ratio = Violent / Arrests)
+```
+```{r}
+Year_Crimes <- Crimes_2010_Present |>
+  group_by(Year) |>
+  summarise(Total_Crime = n_distinct(Case.Number),
+            Violent = sum(Violent.y == 1, na.rm = TRUE),
+            Arrests = sum(Arrest == 'false', na.rm = TRUE),
+            Crime_to_Arrest_Ratio = Violent / Arrests)
+```
+
+```{r}
+Year_Crimes_TIC <- Crimes_2010_Present |>
+  filter(District != 31) |>
+  filter(Primary.Type %in% c("HOMICIDE", "CRIMINAL SEXUAL ASSAULT", "ROBBERY", 
+                             "BATTERY", "ASSAULT", "BURGLARY", "THEFT", 
+                             "MOTOR VEHICLE THEFT", "ARSON", "HUMAN TRAFFICKING")) |>
+  group_by(Year) |>
+  summarise(
+    Total_Crime = n_distinct(Case.Number),
+    Violent = sum(Violent.y == 1, na.rm = TRUE),
+    Arrests = sum(Arrest == TRUE, na.rm = TRUE),  # or Arrest == FALSE if you meant non-arrests
+    Crime_to_Arrest_Ratio = Violent / Arrests
+  )
+```
+
+```{r}
+Year_Crimes_NOT <- Crimes_2010_Present |>
+  filter(District != 31) |>
+  filter(!Primary.Type %in% c("HOMICIDE", "CRIMINAL SEXUAL ASSAULT", "ROBBERY", 
+                             "BATTERY", "ASSAULT", "BURGLARY", "THEFT", 
+                             "MOTOR VEHICLE THEFT", "ARSON", "HUMAN TRAFFICKING")) |>
+  group_by(Year) |>
+  summarise(
+    Total_Crime = n_distinct(Case.Number),
+    Violent = sum(Violent.y == 1, na.rm = TRUE),
+    Arrests = sum(Arrest == TRUE, na.rm = TRUE),  # or Arrest == FALSE if you meant non-arrests
+    Crime_to_Arrest_Ratio = Violent / Arrests
+  )
+```
+
+
+```{r}
+District_Crime_Level <- Crimes_2010_Present |>
+  group_by(District) |>
+  summarise(Violent = sum(Violent.y == 1, na.rm = TRUE),
+            Arrests = sum(Arrest == 'false', na.rm = TRUE),
+            Crime_to_Arrest_Ratio = Violent / Arrests) |>
+  #calculate the z-score, how many sd away from the mean
+  mutate(
+    Violent_Z = (Violent - mean(Violent)) / sd(Violent),
+    Arrests_Z = (Arrests - mean(Arrests)) / sd(Arrests)
+  ) |>
+  mutate(z_scores = Violent_Z + Arrests_Z)
+
+#COMBINE WITH POPULATION DATA
+
+```
+
+```{r}
+District_Crime_Level_Year$Year <- as.numeric(District_Crime_Level_Year$Year)
+District_Crime_Level_Year$District <- as.factor(District_Crime_Level_Year$District)
+library(viridis)
+library(ggrepel)
+```
+
+```{r}
+ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  scale_color_viridis_d(option = "turbo", begin = 0, end = 1)+
+  scale_x_continuous(breaks = seq(2010, 2020, by = 1))+
+  labs(title = "Violent Crime Trends by District",
+       x = "Year",
+       y = "Violent Crime Count",
+       color = "District",
+       linetype = "District") +
+  theme_minimal()
+```
+```{r}
+top_3 <- District_Crime_Level_Year %>%
+  filter(Year == 2020) %>%
+  arrange(desc(Violent)) %>%
+  slice_head(n = 3)  # Select only the top 3 highest crime districts
+
+ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) +
+  geom_line() +  
+  geom_text(data = top_3, aes(label = District), 
+            hjust = -0.1, vjust = 0.5, size = 5) + # Labels only for top 3
+  scale_color_viridis_d(option = "turbo") +  
+  scale_x_continuous(breaks = seq(2010, 2020, by = 1)) +  
+  labs(title = "Violent Crime Trends by District",
+       x = "Year",
+       y = "Violent Crime Count",
+       color = "District") +
+  theme_minimal()
+```
+```{r}
+Strategic_Subject_List_Historical <- read_csv("~/2025 Spring/Thesis/Strategic_Subject_List_-_Historical_20241107.csv")
+```
+```{r}
+left_join(SSL_District, SSL_top50)
+
+ggplot(left_join(SSL_District, SSL_top50), aes(x = District, y = mean)) +
+  geom_line() +  
+  scale_color_viridis_d(option = "turbo") +  
+  scale_x_continuous(breaks = seq(1, 25, by = 1))
+  labs(title = "SSL Top 50 Mean by District",
+       x = "District",
+       y = "Mean of top 50 individuals with the highest SSL score") +
+  theme_minimal()
+```
+```{r}
+#COPA COMPLAINTS
+
+BIA_Cases_By_Involved_Officer <- read_csv("~/2025 Spring/Thesis/BIA_Cases_-_By_Involved_Officer_20250327.csv")
+```
+```{r}
+COPA_Cases_._By_Involved_Officer_20241120 |>
+  filter(as.POSIXct(COMPLAINT_DATE, "%m/%d/%Y %I:%M:%S %p") > 01/01/2010)
+```
+
+
+```{r}
+COPA_BIA_complaints <- left_join(COPA_Cases_._By_Involved_Officer_20241120, BIA_Cases_By_Involved_Officer, by = "LOG_NO") |>
+   mutate(across(where(is.character), ~ na_if(.x, ""))) |>
+  #combine columns
+  mutate(COMPLAINT_DATE = COMPLAINT_DATE.x,
+         CASE_TYPE = coalesce(CASE_TYPE.x, CASE_TYPE.y),
+         CURRENT_STATUS = coalesce(CURRENT_STATUS.x, CURRENT_STATUS.y),
+         FINDING_CODE = coalesce(FINDING_CODE.x, FINDING_CODE.y),
+         BEAT = coalesce(BEAT.x, BEAT.y),
+         RACE_OF_INVOLVED_OFFICER = coalesce(RACE_OF_INVOLVED_OFFICER.x, RACE_OF_INVOLVED_OFFICER.y),
+         SEX_OF_INVOLVED_OFFICER = coalesce(SEX_OF_INVOLVED_OFFICER.x, SEX_OF_INVOLVED_OFFICER.y), 
+         AGE_OF_INVOLVED_OFFICER = coalesce(as.character(AGE_OF_INVOLVED_OFFICER.x), as.character(AGE_OF_INVOLVED_OFFICER.y)),
+         YEARS_ON_FORCE_OF_INVOLVED_OFFICER = coalesce(as.character(YEARS_ON_FORCE_OF_INVOLVED_OFFICER.x), as.character(YEARS_ON_FORCE_OF_INVOLVED_OFFICER.y)),
+         COMPLAINT_DATE = as.POSIXct(COMPLAINT_DATE, format = "%m/%d/%Y %I:%M:%S %p"),
+         COMPLAINT_YEAR = year(as.Date(COMPLAINT_DATE))) |>
+  #select combined columns
+  select(LOG_NO, COMPLAINT_DATE, ASSIGNMENT, CASE_TYPE, CURRENT_STATUS, CURRENT_CATEGORY, FINDING_CODE, POLICE_SHOOTING, BEAT, RACE_OF_INVOLVED_OFFICER, SEX_OF_INVOLVED_OFFICER, AGE_OF_INVOLVED_OFFICER, YEARS_ON_FORCE_OF_INVOLVED_OFFICER, COMPLAINT_YEAR) |>
+  #filter complaints from 2010-2020
+  filter(COMPLAINT_YEAR >= 2010 & COMPLAINT_YEAR <= 2020) |>
+  #standardize beat column and create police district column
+  mutate(BEAT = ifelse(nchar(as.character(BEAT)) != 4, 
+                             paste0("0", BEAT), 
+                             as.character(BEAT))) |>
+  mutate(DISTRICT = substr(BEAT, 1, 2))
+```
+
+```{r}
+colnames(BIA_Cases_By_Involved_Officer)
+```
+
+-----------------
+#Year Breakdown
+```{r}
+Year_Crimes <- Crimes_2010_Present |>
+  group_by(Year) |>
+  summarise(Violent = sum(Violent.y == 1, na.rm = TRUE),
+            Arrests = sum(Arrest == 'false', na.rm = TRUE),
+            Crime_to_Arrest_Ratio = Violent / Arrests) |>
+  #calculate the z-score, how many sd away from the mean
+  mutate(
+    Violent_Z = (Violent - mean(Violent)) / sd(Violent),
+    Arrests_Z = (Arrests - mean(Arrests)) / sd(Arrests)
+  ) |>
+  mutate(z_scores = Violent_Z + Arrests_Z)
+```
+
+----------------------------
+
+```{r}
+
+```
+

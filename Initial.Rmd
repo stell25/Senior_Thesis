@@ -1,0 +1,83 @@
+---
+title: "Initial"
+output: html_document
+date: "2024-10-31"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+Crimes_._2001_to_Present <- Crimes_._2001_to_Present_20241031
+```
+
+```{r}
+counts <- Crimes_._2001_to_Present |>
+  filter(Year >= 2010) |>
+  group_by(Year, `Primary.Type`) |>
+  summarise(count = n())
+```
+
+```{r}
+year_totals <- Crimes_._2001_to_Present |>
+  filter(Year >= 2010) |>
+  group_by(Year) |>
+  summarise(count = n()) |>
+  mutate(`Primary.Type` = "Total")
+```
+
+```{r}
+counts <- bind_rows(counts, year_totals)
+```
+
+```{r}
+counts_f <- counts |>
+  filter(Primary.Type %in% c("ASSAULT", "BATTERY", "BURGLARY", "CRIMINAL DAMAGE","MOTOR VEHICLE THEFT
+","NARCOTICS", "ROBBERY","THEFT"))
+
+ggplot(data = (counts_f), aes(x = Year, y = count)) +
+  geom_line(color = "steelblue",linewidth = 1) +
+  geom_point(color = "steelblue") +
+  facet_wrap(~ `Primary.Type`) +
+  title("Counts of Certain Types of Crimes from 2010-Present")
+```
+
+```{r}
+ggplot(year_totals, aes(x = Year, y = count)) +
+  geom_line(color = "steelblue", size = 1) +
+  geom_point(color = "steelblue")
+```
+
+```{r}
+countsw_arrests <- Crimes_._2001_to_Present |>
+  group_by(Year, Primary.Type, Arrest) |>
+  summarise(Count = n())
+```
+
+```{r}
+ggplot(data = (countsw_arrests |>
+                 filter(Year > 2010) |>
+                 filter(Primary.Type %in% c("ASSAULT", "BATTERY", "BURGLARY", "CRIMINAL DAMAGE","MOTOR VEHICLE THEFT","NARCOTICS", "ROBBERY","THEFT"))), 
+       aes(x = Year, y = Count, colour = Arrest, group = Arrest)) +
+  geom_line(aes(colour=Arrest), size = 1) +
+  geom_point(size = 0.5) +
+  facet_wrap(~ `Primary.Type`)
+```
+
+```{r}
+countsw_arrests |>
+  filter(Year >= 2010) |>
+  group_by(Year, Arrest) |>
+  summarise(Count = sum(Count)) |>
+  ggplot(aes(x = Year, y = Count, group = Arrest, colour = Arrest)) +
+  geom_line() +
+  geom_point()
+```
+
