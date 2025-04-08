@@ -1,0 +1,38 @@
+---
+title: "Thesis"
+output: html_document
+date: "2024-10-10"
+---
+```{r}
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+```
+
+```{r}
+`All.Violent.Offenses.Reported.by.Population_10.10.2024.(1)` <- read.csv("~/2024 Fall/Thesis/All Violent Offenses Reported by Population_10-10-2024 (1).csv")
+```
+
+```{r}
+violentcrimes <- pivot_longer(`All.Violent.Offenses.Reported.by.Population_10.10.2024.(1)`, cols = -series, names_to = "Month", values_to = "Rate")
+```
+
+```{r}
+violentcrimes |>
+  group_by(series) |>
+  summarise(count = n())
+```
+
+```{r}
+departments <- c("Chicago Police Department","Los Angeles Police Department","New York City Police Department","Philadelphia Police Department", "United States")
+
+violentcrimes <- violentcrimes |>
+  filter(series %in% departments) |>
+  group_by(series)
+
+ggplot(violentcrimes, aes(x = Month, y = Rate, group = series, color = series)) +
+  geom_line(size = 1) +   # Draw the lines
+  geom_point(size = 2)
+```
+
+

@@ -1,0 +1,331 @@
+---
+title: "Chicago - Initial Exploration"
+output: html_document
+date: "2024-10-31"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(zoo)
+
+setwd("~/2025 Spring/Thesis")
+```
+
+```{r}
+Strategic_Subject_List_._Historical_20241107 <- read.csv("~/2024 Fall/Thesis/Strategic_Subject_List_-_Historical_20241107.csv")
+```
+
+```{r}
+Crimes_2010_Present <- read.csv("~/2024 Fall/Thesis/Crimes_-_2010_to_Present_20241114.csv")
+```
+
+```{r}
+colnames(Strategic_Subject_List_._Historical_20241107)
+```
+
+```{r}
+SSL_District <- Strategic_Subject_List_._Historical_20241107 |>
+  group_by(LATEST.DIST.RES) |>
+  summarise(Count = n()) |>
+  rename(District = LATEST.DIST.RES)
+```
+
+
+```{r}
+colnames(Crimes_2010_Present)
+```
+```{r}
+Crimes_District <- Crimes_2010_Present |>
+  group_by(District) |>
+  summarise(Count = n())
+```
+
+```{r}
+SSL_Crimes_byDistrict <- full_join(SSL_District |> rename(SSL_Count = Count),
+          Crimes_District |> rename(Crimes_Count = Count),
+          by = "District")
+
+write.csv(SSL_Crimes_byDistrict, "SSL_Crimes_byDistrict.csv")
+```
+
+
+```{r}
+District_nomatch <- Crimes_2010_Present |>
+  mutate(Beat = ifelse(nchar(Beat) == 3, paste0("0", Beat), as.character(Beat))) |>
+  mutate(first_two_digits = as.integer(substr(as.character(Beat), 1, 2))) |>
+  mutate(District_Match = ifelse(first_two_digits == District, 1, 0)) |>
+  filter(District_Match == 0)
+```
+
+```{r}
+District_nomatch |>
+  group_by(District) |>
+  summarise(Count = n())
+```
+
+
+```{r}
+Crimes_2010_Present |>
+  mutate(Beat = ifelse(nchar(Beat) == 3, paste0("0", Beat), as.character(Beat))) |>
+  mutate(first_two_digits = as.integer(substr(as.character(Beat), 1, 2))) |>
+  mutate(District_Match = ifelse(first_two_digits == District, 1, 0)) |>
+  group_by(first_two_digits) |>
+  
+```
+
+---------------
+#Demographics on HeatList
+
+```{r}
+SSL_by_Race <- Strategic_Subject_List_._Historical_20241107 |>
+  select(SSL.SCORE, RACE.CODE.CD, HEAT.SCORE) |>
+  group_by(RACE.CODE.CD, SSL.SCORE) |>
+  summarise(Count = n())
+
+SSL_by_Age <- Strategic_Subject_List_._Historical_20241107 |>
+  select(SSL.SCORE, AGE.GROUP, HEAT.SCORE) |>
+  group_by(AGE.GROUP, SSL.SCORE) |>
+  summarise(Count = n())
+```
+
+```{r}
+SSL_Race_Counts <- Strategic_Subject_List_._Historical_20241107 |>
+  select(SSL.SCORE, RACE.CODE.CD, HEAT.SCORE) |>
+  group_by(RACE.CODE.CD, SSL.SCORE) |>
+  filter(RACE.CODE.CD != "U") |>
+  summarise(Count = n())
+
+ggplot(SSL_Race_Counts, aes(x = SSL.SCORE, color = RACE.CODE.CD, fill = RACE.CODE.CD)) +
+  geom_density(alpha = 0.3)
+```
+```{r}
+Strategic_Subject_List_._Historical_20241107 |>
+  select(SSL.SCORE, RACE.CODE.CD, HEAT.SCORE) |>
+  group_by(RACE.CODE.CD, SSL.SCORE) |>
+  filter(!RACE.CODE.CD %in% c("U", "API", "I")) |>
+  summarise(Count = n()) |>
+  ggplot(aes(x = SSL.SCORE, color = RACE.CODE.CD, fill = RACE.CODE.CD)) +
+  geom_density(alpha = 0.3)
+```
+```{r}
+Strategic_Subject_List_._Historical_20241107 |>
+  select(SSL.SCORE, RACE.CODE.CD, HEAT.SCORE) |>
+  group_by(RACE.CODE.CD, SSL.SCORE) |>
+  filter(!RACE.CODE.CD %in% c("U", "API", "I")) |>
+  summarise(Count = n())
+```
+
+```{r}
+Strategic_Subject_List_._Historical_20241107 |>
+  group_by(AGE.GROUP) |>
+  summarise(Count = n()) |>
+  mutate(AGE.GROUP = case_when(
+    AGE.GROUP == "less than 20" ~ "<20",
+    TRUE ~ AGE.GROUP)) |>
+  filter(AGE.GROUP != "") |>
+  ggplot(aes(x = AGE.GROUP, y = Count)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Count by Age Group",
+    x = "Age Group",               
+    y = "Count"                   
+  ) +
+  theme_minimal()
+```
+```{r}
+Strategic_Subject_List_._Historical_20241107 |>
+  summarise(count = n())
+```
+
+```{r}
+Percentage_by_Age_Race <- Strategic_Subject_List_._Historical_20241107 |>
+  mutate(AGE.GROUP = case_when(
+    AGE.GROUP == "less than 20" ~ "<20",
+    TRUE ~ AGE.GROUP)) |>
+  filter(AGE.GROUP != "") |>
+  group_by(RACE.CODE.CD, AGE.GROUP) |>
+  summarise(Count = n()) |>
+  mutate(Percentage = Count/398684)
+```
+```{r}
+Percentage_by_Age_Race |>
+  filter(!RACE.CODE.CD %in% c("U", "API", "I", "WBH")) |>
+  ggplot(aes(x = AGE.GROUP, y = Percentage, fill = RACE.CODE.CD)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Percentage of Heatlist by Age and Race",
+    x = "Age Group",               
+    y = "Count"                   
+  )
+```
+
+```{r}
+#Trap Data
+Strategic_Subject_List_._Historical_20241107 |>
+  group_by(TRAP.STATUS, TRAP.FLAGS) |>
+  summarise(count = n())
+
+```
+
+```{r}
+SSL_over400 <- Strategic_Subject_List_._Historical_20241107 |>
+  filter(SSL.SCORE >= 400) |>
+  group_by(SSL.SCORE) |>
+  summarise(count = n())
+```
+```{r}
+SSL_top50 <- Strategic_Subject_List_._Historical_20241107 |>
+  group_by(LATEST.DIST.RES) |>
+  arrange(desc(SSL.SCORE)) |>
+  slice_head(n = 50) |>
+  summarise(max = max(SSL.SCORE), median = median(SSL.SCORE), mean = mean(SSL.SCORE)) |>
+  rename(District = LATEST.DIST.RES)
+
+SSL_top50_byDistrict <- Strategic_Subject_List_._Historical_20241107 |>
+  group_by(LATEST.DIST.RES) |>
+  arrange(desc(SSL.SCORE)) |>
+  slice_head(n = 50)
+```
+
+```{r}
+SSL_top50_byDistrict |>
+  select(SSL.SCORE, RACE.CODE.CD, HEAT.SCORE) |>
+  group_by(RACE.CODE.CD, SSL.SCORE) |>
+  filter(!RACE.CODE.CD %in% c("U", "API", "I")) |>
+  summarise(Count = n()) |>
+  ggplot(aes(x = SSL.SCORE, color = RACE.CODE.CD, fill = RACE.CODE.CD)) +
+  geom_density(alpha = 0.3)
+```
+```{r}
+SSL_top50_byDistrict |>
+  group_by(AGE.GROUP) |>
+  summarise(Count = n()) 
+
+|>
+  mutate(AGE.GROUP = case_when(
+    AGE.GROUP == "less than 20" ~ "<20",
+    TRUE ~ AGE.GROUP)) |>
+  filter(AGE.GROUP != "") |>
+  ggplot(aes(x = AGE.GROUP, y = Count)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Count by Age Group",
+    x = "Age Group",               
+    y = "Count"                   
+  )
+```
+
+
+```{r}
+PoliceDistrictDec2012 <- PoliceDistrictDec2012 |>
+  select(the_geom, DIST_NUM) |>
+  rename(District = DIST_NUM)
+
+PoliceDistrictDec2012
+```
+
+```{r}
+SSL_top50_byDistrict<- left_join(SSL_top50, PoliceDistrictDec2012, by = "District")
+
+write.csv(SSL_top50_byDistrict, "SSL_top50_byDistrict.csv")
+```
+
+```{r}
+COPA_Cases_._By_Involved_Officer_20241120 |>
+  mutate(Beat = ifelse(nchar(Beat) == 3, paste0("0", Beat), as.character(Beat))) |>
+  mutate(first_two_digits = as.integer(substr(as.character(Beat), 1, 2)))
+```
+
+```{r}
+Strategic_Subject_List_._Historical_20241107 |>
+  filter(is.na(SSL.LAST.PTV.DATE))
+  summarise(count = n())
+```
+```{r}
+ViolentCrimes_Count <- Crimes_2010_Present |>
+  filter(IUCR %in% c("0110", "0130", "0261", "0262", "0263", "0264", "0265", "0266", "0271", "0272", 
+    "0273", "0274", "0275", "0281", "0291", "0312", "0313", "031A", "031B", "0320", 
+    "0325", "0326", "0330", "0331", "0334", "0337", "033A", "033B", "0340", "041A", 
+    "041B", "0420", "0430", "0450", "0451", "0452", "0453", "0461", "0462", "0479", 
+    "0480", "0481", "0482", "0483", "0485", "0487", "0488", "0489", "0490", "0491", 
+    "0492", "0493", "0495", "0496", "0497", "0498", "0499", "0510", "051A", "051B", 
+    "0520", "0530", "0550", "0551", "0552", "0553", "0555", "0556", "0557", "0558", 
+    "0610", "0620", "0630", "0650", "0810", "0820", "0830", "0840", "0841", "0842", 
+    "0843", "0850", "0860", "0865", "0870", "0880", "0890", "0895", "0910", "0915", 
+    "0917", "0918", "0920", "0925", "0927", "0928", "0930", "0935", "0937", "0938", 
+    "1010", "1020", "1025", "1050", "1055", "1090", "1753", "1754")) |>
+  mutate(Day = as.Date(Date, format = "%m/%d/%Y")) |>
+  group_by(Day) |>
+  summarise(ViolentCrimes_Count = n())
+  
+NonviolentCrimes_Count <- Crimes_2010_Present |>
+  filter(!(IUCR %in% c("0110", "0130", "0261", "0262", "0263", "0264", "0265", "0266", "0271", "0272", 
+    "0273", "0274", "0275", "0281", "0291", "0312", "0313", "031A", "031B", "0320", 
+    "0325", "0326", "0330", "0331", "0334", "0337", "033A", "033B", "0340", "041A", 
+    "041B", "0420", "0430", "0450", "0451", "0452", "0453", "0461", "0462", "0479", 
+    "0480", "0481", "0482", "0483", "0485", "0487", "0488", "0489", "0490", "0491", 
+    "0492", "0493", "0495", "0496", "0497", "0498", "0499", "0510", "051A", "051B", 
+    "0520", "0530", "0550", "0551", "0552", "0553", "0555", "0556", "0557", "0558", 
+    "0610", "0620", "0630", "0650", "0810", "0820", "0830", "0840", "0841", "0842", 
+    "0843", "0850", "0860", "0865", "0870", "0880", "0890", "0895", "0910", "0915", 
+    "0917", "0918", "0920", "0925", "0927", "0928", "0930", "0935", "0937", "0938", 
+    "1010", "1020", "1025", "1050", "1055", "1090", "1753", "1754"))) |>
+  mutate(Day = as.Date(Date, format = "%m/%d/%Y")) |>
+  group_by(Day) |>
+  summarise(NonviolentCrimes_Count = n())
+
+```
+
+```{r}
+ViolentCrimes_Count |>
+  filter(Day < as.Date("2020-01-01")) |>
+  ggplot(aes(x = Day, y = ViolentCrimes_Count)) +
+  geom_line() +
+  scale_x_date(breaks = seq(as.Date("2010-01-01"), as.Date("2020-01-01"), by = "1 year"),
+               date_labels = "%Y") + # Format labels as "Jan 01"
+  labs(x = "Date", y = "Value")
+```
+```{r}
+ViolentCrimes_CountMonthly <- ViolentCrimes_Count |>
+  filter(Day < as.Date("2020-01-01")) |>
+  mutate(Month = as.yearmon(Day)) |>
+  group_by(Month) |>
+  summarise(ViolentCrimes_Count = sum(ViolentCrimes_Count))
+
+NonviolentCrimes_CountMonthly <-NonviolentCrimes_Count |>
+  filter(Day < as.Date("2020-01-01")) |>
+  mutate(Month = as.yearmon(Day)) |>
+  group_by(Month) |>
+  summarise(NonviolentCrimes_Count = sum(NonviolentCrimes_Count))
+
+Crimes_Monthly <- left_join(ViolentCrimes_CountMonthly, NonviolentCrimes_CountMonthly, by = "Month") |>
+  mutate(TotalCrimes = ViolentCrimes_Count + NonviolentCrimes_Count)
+
+pivot_longer(Crimes_Monthly, 
+             cols = c("ViolentCrimes_Count", "NonviolentCrimes_Count", "TotalCrimes"), 
+             names_to = "Type", 
+             values_to = "Count") |>
+  ggplot(aes(x = as.Date(Month), y = Count, color = Type, group = Type)) +
+  geom_line() +
+  scale_x_date(breaks = seq(as.Date("2010-01-01"), as.Date("2020-01-01"), by = "1 year"),
+               date_labels = "%Y") + # Format labels as "Jan 01"
+  labs(x = "Date", y = "Value")
+```
+
+```{r}
+PoliceDistrictDec2012 <- PoliceDistrictDec2012 |>
+  rename(District = DIST_NUM)
+```
+
+```{r}
+SSL_top50_district_spfl <- left_join(SSL_top50, PoliceDistrictDec2012, by = "District")
+
+write.csv(SSL_top50_district_spfl, "SSL_top50_district_spfl.csv")
+```
+

@@ -44,11 +44,49 @@ Crimes_2010_Present <- Crimes_2010_Present |> filter(Year <= 2020)
 ```{r}
 District_Crime_Level_Year <- Crimes_2010_Present |>
   group_by(District, Year) |>
-  summarise(Total_Crime = n(),
+  summarise(TIC = n(),
             Violent = sum(Violent.y == 1, na.rm = TRUE),
             Arrests = sum(Arrest == 'false', na.rm = TRUE),
-            Crime_to_Arrest_Ratio = Violent / Arrests)
+            Crime_to_Arrest_Ratio = TIC / Arrests)
 ```
+```{r}
+District_population <- left_join(District_Crime_Level_Year, District_Population_and_Ethnicity) |>
+    mutate(Crime_per_1000 = TIC/(`Total Population`/1000))
+write.csv((left_join(District_Crime_Level_Year, District_Population_and_Ethnicity)), "District_level.csv")
+```
+```{r}
+District_population |>
+  group_by(District) |>
+  summarise(Average_Crime = mean(`TIC`),
+            Average_Crimeper1000 = mean(Crime_per_1000)) |>
+```
+```{r}
+library(knitr)
+kable((District_population |>
+  group_by(District) |>
+  summarise(Average_Crime = mean(`TIC`),
+            Average_Crimeper1000 = mean(Crime_per_1000))), format = "latex", digits = 2, caption = "Average Crime by District")
+```
+
+
+```{r}
+District_population |>
+  sort(Crime_per_1000)
+  
+ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  scale_color_viridis_d(option = "turbo", begin = 0, end = 1)+
+  scale_x_continuous(breaks = seq(2010, 2020, by = 1))+
+  labs(title = "Violent Crime Trends by District",
+       x = "Year",
+       y = "Violent Crime Count",
+       color = "District",
+       linetype = "District") +
+  theme_minimal()
+```
+
+
 ```{r}
 Year_Crimes <- Crimes_2010_Present |>
   group_by(Year) |>
