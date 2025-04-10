@@ -25,40 +25,79 @@ View(Illinois_and_National_Crime_Stats)
 ```
 
 ```{r}
-#Test DID analysis - using CPD reported Crime statistics
-test1 <- Illinois_and_National_Crime_Stats |>
+# DID analysis - using CPD reported Crime statistics
+reported_DID <- Illinois_and_National_Crime_Stats |>
   filter(Year != 2020) |>
-  select(Year, `Illinois - TIC Offenses`, `Rest of Illinois - CPD-TIC`, `Chicago PD - Reported Total Index Crime`) |>
-  rename(Illinois = `Illinois - TIC Offenses`,
-         Non_Chicago = `Rest of Illinois - CPD-TIC`,
-         Chicago = `Chicago PD - Reported Total Index Crime`)
+  select(Year, Non_Chicago_Reported_TIC, CPD_Reported_TIC) |>
+  rename(Non_Chicago = Non_Chicago_Reported_TIC,
+         Chicago = CPD_Reported_TIC)
 ```
 
 ```{r}
-test1 <- test1 |>
-  pivot_longer(cols = c(Illinois, Non_Chicago, Chicago), names_to = "Area") |>
+reported_DID <- reported_DID |>
+  pivot_longer(cols = c(Non_Chicago, Chicago), names_to = "Area") |>
+  #create a dummy variable for when the treatment started
   mutate(time = ifelse(Year > 2012, 1, 0)) |>
+  #create a dummy variable for geographic area treated
   mutate(treated = ifelse(Area == "Chicago", 1, 0)) |>
+  #create an interaction between time and treated variables
   mutate(did = time*treated)
 ```
 
 ```{r}
-didreg = lm(value ~ treated + time + did, data = test1)
+didreg = lm(value ~ treated + time + did, data = reported_DID)
 summary(didreg)
 ```
 
 ```{r}
-didreg1 = lm(value ~ treated*time, data = test1)
+didreg1 = lm(value ~ treated*time, data = reported_DID)
 summary(didreg1)
 ```
+
 ```{r}
 library(stargazer)
 
-# Example using a DiD model with 'feols'
-fe_model <- feols(value ~ did | group_id + year, data = test1)
-
 # Export results to LaTeX (or Word)
 stargazer(didreg, type = "latex", out = "DID_results.tex")  # To export LaTeX
+# stargazer(fe_model, type = "text", out = "DID_results.txt")  # To export text
+```
+
+```{r}
+# DID analysis - using CPD reported Crime Rate for population
+reported_rate_DID <- Illinois_and_National_Crime_Stats |>
+  filter(Year != 2020) |>
+  select(Year, Illinois_TIX_Offenses, Illinois_Population, Non_Chicago_Reported_TIC, Non_Chicago_Population, CPD_Reported_TIC, `CPD_Reported Population`) |>
+  mutate(Non_Chicago_CrimePer = Non_Chicago_Reported_TIC/(Non_Chicago_Population/1000),
+         Chicago_CrimePer = CPD_Reported_TIC/(`CPD_Reported Population`/1000)) |>
+  select(Year, Non_Chicago_CrimePer, Chicago_CrimePer)
+```
+
+```{r}
+reported_rate_DID <- reported_rate_DID |>
+  pivot_longer(cols = c(Non_Chicago_CrimePer, Chicago_CrimePer), names_to = "Area") |>
+  #create a dummy variable for when the treatment started
+  mutate(time = ifelse(Year > 2012, 1, 0)) |>
+  #create a dummy variable for geographic area treated
+  mutate(treated = ifelse(Area == "Chicago_CrimePer", 1, 0)) |>
+  #create an interaction between time and treated variables
+  mutate(did = time*treated)
+```
+
+```{r}
+didreg_rate = lm(value ~ treated + time + did, data = reported_rate_DID)
+summary(didreg_rate)
+```
+
+```{r}
+didreg1_rate = lm(value ~ treated*time, data = reported_rate_DID)
+summary(didreg1_rate)
+```
+
+```{r}
+library(stargazer)
+
+# Export results to LaTeX (or Word)
+stargazer(didreg_rate, type = "latex", out = "DID_results.tex")  # To export LaTeX
 # stargazer(fe_model, type = "text", out = "DID_results.txt")  # To export text
 ```
 
