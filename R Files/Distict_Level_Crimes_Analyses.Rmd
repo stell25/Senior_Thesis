@@ -35,7 +35,7 @@ IUCR_Codes <- read.csv("~/2025 Spring/Thesis/Raw Data/Chicago_Police_Department_
 Crimes_2010_Present <- left_join(Crimes_2010_Present, IUCR_Codes, by = "IUCR")
 Crimes_2010_Present$Violent.y <- replace(Crimes_2010_Present$Violent, is.na(Crimes_2010_Present$Violent), 0)
 
-Crimes_2010_Present <- Crimes_2010_Present |> filter(Year <= 2020)
+Crimes_2010_Present <- Crimes_2010_Present |> filter(Year < 2020)
 ```
 
 --------------------------------------------------------------------------------
@@ -44,22 +44,42 @@ Crimes_2010_Present <- Crimes_2010_Present |> filter(Year <= 2020)
 ```{r}
 District_Crime_Level_Year <- Crimes_2010_Present |>
   group_by(District, Year) |>
-  summarise(TIC = n(),
+  summarise(Total_Crime = n_distinct(Case.Number),
             Violent = sum(Violent.y == 1, na.rm = TRUE),
-            Arrests = sum(Arrest == 'false', na.rm = TRUE),
-            Crime_to_Arrest_Ratio = TIC / Arrests)
+            Arrests = sum(Arrest == 'false', na.rm = TRUE))
 ```
+```{r}
+Year_District_Crimes_TIC <- Crimes_2010_Present |>
+  filter(INDEX.CODE == "I") |>
+  group_by(District, Year) |>
+  summarise(
+    TIC = n_distinct(Case.Number),
+    Violent = sum(Violent.y == 1, na.rm = TRUE),
+    Arrests = sum(Arrest == TRUE, na.rm = TRUE))
+```
+```{r}
+left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c("District", "Year")) |>
+  select(District, Year, Total_Crime, TIC) |>
+  pivot_wider(names_from = (District), values_from = TIC)
+
+write.csv(left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c("District", "Year")) |>
+  select(District, Year, Total_Crime, TIC), file = "District_TIC_byYear.csv")
+```
+
+
 ```{r}
 District_population <- left_join(District_Crime_Level_Year, District_Population_and_Ethnicity) |>
     mutate(Crime_per_1000 = TIC/(`Total Population`/1000))
 write.csv((left_join(District_Crime_Level_Year, District_Population_and_Ethnicity)), "District_level.csv")
 ```
+
 ```{r}
 District_population |>
   group_by(District) |>
   summarise(Average_Crime = mean(`TIC`),
             Average_Crimeper1000 = mean(Crime_per_1000)) |>
 ```
+
 ```{r}
 library(knitr)
 kable((District_population |>
@@ -96,20 +116,6 @@ Year_Crimes <- Crimes_2010_Present |>
             Crime_to_Arrest_Ratio = Violent / Arrests)
 ```
 
-```{r}
-Year_Crimes_TIC <- Crimes_2010_Present |>
-  filter(District != 31) |>
-  filter(Primary.Type %in% c("HOMICIDE", "CRIMINAL SEXUAL ASSAULT", "ROBBERY", 
-                             "BATTERY", "ASSAULT", "BURGLARY", "THEFT", 
-                             "MOTOR VEHICLE THEFT", "ARSON", "HUMAN TRAFFICKING")) |>
-  group_by(Year) |>
-  summarise(
-    Total_Crime = n_distinct(Case.Number),
-    Violent = sum(Violent.y == 1, na.rm = TRUE),
-    Arrests = sum(Arrest == TRUE, na.rm = TRUE),  # or Arrest == FALSE if you meant non-arrests
-    Crime_to_Arrest_Ratio = Violent / Arrests
-  )
-```
 
 ```{r}
 Year_Crimes_NOT <- Crimes_2010_Present |>
@@ -182,9 +188,11 @@ ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) 
        color = "District") +
   theme_minimal()
 ```
+
 ```{r}
 Strategic_Subject_List_Historical <- read_csv("~/2025 Spring/Thesis/Strategic_Subject_List_-_Historical_20241107.csv")
 ```
+
 ```{r}
 left_join(SSL_District, SSL_top50)
 
