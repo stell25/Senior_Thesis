@@ -8,77 +8,103 @@ date: "2025-03-06"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
 ```{r}
 library(tidyverse)
 library(ggplot2)
 library(readr)
+library(colorspace)
+library(tmap)
+library(leaflet)
+library(sf)
 
 options(scipen = 999)
+file_path <- dirname(getwd())
+file_path
+palette_30 <- qualitative_hcl(30, palette = "Dark 3")  # Or try "Set 2", "Harmonic", etc.
 ```
 
 ```{r}
 #load in Crime Dataset from 2010-Present
-Crimes_2010_to_Present <- read_csv("~/2025 Spring/Thesis/Cleaned Data/Crimes_-_2010_to_Present_20241114.csv")
+Crimes_2010_to_Present <- read_csv(file.path(file_path, "Cleaned Data",  "Crimes_-_2010_to_Present_20241114.csv"))
 
 #load in IUCR Codes Dataset
-IUCR_Codes <- read.csv("~/2025 Spring/Thesis/Raw Data/Chicago_Police_Department_-_Illinois_Uniform_Crime_Reporting__IUCR__Codes_20250306.csv")
-```
+IUCR_Codes <- read.csv(file.path(file_path,"Raw Data", "Chicago_Police_Department_-_Illinois_Uniform_Crime_Reporting__IUCR__Codes_20250306.csv"))
 
-```{r}
-#Add a Boolean that signifies if the reported incident was a violent crime
-Crimes_2010_Present <- left_join(Crimes_2010_Present, IUCR_Codes, by = "IUCR")
-Crimes_2010_Present$Violent.y <- replace(Crimes_2010_Present$Violent, is.na(Crimes_2010_Present$Violent), 0)
-
-Crimes_2010_Present <- Crimes_2010_Present |> filter(Year < 2020)
+#load in District Population Dataset
+District_Population_Ethnicity <- read.csv(file.path(file_path,"Cleaned Data", "District Population and Ethnicity.csv"))
 ```
 
 --------------------------------------------------------------------------------
 #District Breakdown
 
 ```{r}
+#Add a Boolean that signifies if the reported incident was a violent crime
+Crimes_2010_Present <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "IUCR") |>
+  filter(Year < 2020)
+```
+
+```{r}
+#Creates Total Crime Count for Each district from 2010-2019
 District_Crime_Level_Year <- Crimes_2010_Present |>
   group_by(District, Year) |>
-  summarise(Total_Crime = n_distinct(Case.Number),
-            Violent = sum(Violent.y == 1, na.rm = TRUE),
+  summarise(Total_Crime = n_distinct(`Case Number`),
+            Violent = sum(Violent == 1, na.rm = TRUE),
             Arrests = sum(Arrest == 'false', na.rm = TRUE))
 ```
+
 ```{r}
+#Create TIC counts for Each District from 2010-2019
 Year_District_Crimes_TIC <- Crimes_2010_Present |>
+  #INDEX.CODE (from the IUCR) dataset indicates if crimes are used in TIC Count
   filter(INDEX.CODE == "I") |>
   group_by(District, Year) |>
   summarise(
-    TIC = n_distinct(Case.Number),
-    Violent = sum(Violent.y == 1, na.rm = TRUE),
+    TIC = n_distinct(`Case Number`),
+    Violent = sum(Violent == 1, na.rm = TRUE),
     Arrests = sum(Arrest == TRUE, na.rm = TRUE))
 ```
+
 ```{r}
+#Join Total Crime Counts and Total Index Crime
 left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c("District", "Year")) |>
-  select(District, Year, Total_Crime, TIC) |>
+  select(District, Year, TIC) |>
   pivot_wider(names_from = (District), values_from = TIC)
 
+#Export File
+write.csv(left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c("District", "Year")) |>
+  select(District, Year, TIC), file = "District_TIC_byYear.csv")
+```
+
+```{r}
+#Join Total Crime Counts and Total Index Crime
+Year_District_Crimes_TIC |>
+  select(District, Year, TIC) |>
+  pivot_wider(names_from = (District), values_from = TIC)
+
+#Export File
 write.csv(left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c("District", "Year")) |>
   select(District, Year, Total_Crime, TIC), file = "District_TIC_byYear.csv")
 ```
 
-
 ```{r}
-District_population <- left_join(District_Crime_Level_Year, District_Population_and_Ethnicity) |>
-    mutate(Crime_per_1000 = TIC/(`Total Population`/1000))
-write.csv((left_join(District_Crime_Level_Year, District_Population_and_Ethnicity)), "District_level.csv")
+#Creates a Crime per 1000 Rate Column
+Year_District_Crimes_TIC <- Year_District_Crimes_TIC %>%
+  mutate(District = as.integer(District))
+
+District_population <- left_join(Year_District_Crimes_TIC, District_Population_Ethnicity, by = join_by(District)) |>
+  mutate(Crime_per_1000 = TIC/(`Total.Population`/1000))
+
+write.csv(District_population, "District_level.csv")
 ```
 
 ```{r}
+#Averages Total Crime and Total Index Crime across 2010-2019 for each district
 District_population |>
   group_by(District) |>
   summarise(Average_Crime = mean(`TIC`),
-            Average_Crimeper1000 = mean(Crime_per_1000)) |>
+            Average_Crimeper1000 = mean(Crime_per_1000))
 ```
+
 
 ```{r}
 library(knitr)
@@ -88,21 +114,35 @@ kable((District_population |>
             Average_Crimeper1000 = mean(Crime_per_1000))), format = "latex", digits = 2, caption = "Average Crime by District")
 ```
 
-
 ```{r}
-District_population |>
-  sort(Crime_per_1000)
-  
-ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) +
+ggplot(District_population, aes(x = Year, y = Violent, color = factor(District))) +
   geom_line() +
   geom_point(size = 0.5) +
-  scale_color_viridis_d(option = "turbo", begin = 0, end = 1)+
-  scale_x_continuous(breaks = seq(2010, 2020, by = 1))+
+  scale_color_viridis_d(option = "turbo", begin = 0, end = 1) +
+  scale_x_continuous(breaks = seq(2010, 2020, by = 1)) +
   labs(title = "Violent Crime Trends by District",
        x = "Year",
        y = "Violent Crime Count",
-       color = "District",
-       linetype = "District") +
+       color = "District") +
+  theme_minimal()
+```
+
+```{r}
+(District_population |>
+  group_by(District) |>
+  summarise(Average_Crime = mean(`TIC`),
+            Average_Crimeper1000 = mean(Crime_per_1000)))
+
+
+ggplot(District_population, aes(x = Year, y = Crime_per_1000, color = factor(District))) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  scale_color_manual(values = palette_30)+
+  scale_x_continuous(breaks = seq(2010, 2020, by = 1)) +
+  labs(title = "Violent Crime Trends by District",
+       x = "Year",
+       y = "Violent Crime Count",
+       color = "District") +
   theme_minimal()
 ```
 
@@ -263,8 +303,65 @@ Year_Crimes <- Crimes_2010_Present |>
 ```
 
 ----------------------------
+#Mapping
 
 ```{r}
+District_Summaries <- District_population |>
+  group_by(District) |>
+  summarise(TIC = mean(TIC),
+            Crime_per_1000 = mean(Crime_per_1000))
+```
 
+```{r}
+PoliceDistrictBoundaries_Current <- read_csv(file.path(file_path, "Shapefiles",  "PoliceDistrictBoundaries_Current.csv"))
+```
+```{r}
+PoliceDistrictBoundaries_Current <- read_sf(file.path(file_path, "Shapefiles",  "PoliceDistrictBoundaries_Current.csv"))
+```
+
+```{r}
+PoliceDistrictBoundaries_Current <- PoliceDistrictBoundaries_Current |>
+  rename(geometry = the_geom,
+         District = DIST_NUM) |>
+  select(geometry, District)
+```
+
+```{r}
+PoliceDistrictBoundaries_Current <- st_as_sf(PoliceDistrictBoundaries_Current, wkt = "geometry")
+
+PoliceDistrictBoundaries_Current$District <- as.integer(PoliceDistrictBoundaries_Current$District)
+```
+
+```{r}
+left_join(PoliceDistrictBoundaries_Current, District_Summaries)
+```
+
+```{r}
+ggplot(data = PoliceDistrictBoundaries_Current) +
+  geom_sf(aes(geometry = geometry)) +
+  labs(title = "Police District Boundaries")
+```
+```{r}
+install.packages("classInt")
+library(classInt)
+
+# Get the breaks
+breaks <- classIntervals(District_Summaries$Crime_per_1000, n = 5, style = "jenks")$brks
+```
+
+```{r}
+centroids <- st_centroid(PoliceDistrictBoundaries_Current
+
+ggplot(left_join(PoliceDistrictBoundaries_Current, District_Summaries)) +
+  geom_sf(aes(fill = Crime_per_1000, alpha = 0.6)) +
+  geom_text(data = centroids, aes(label = District, geometry = geometry), stat = "sf_coordinates", size = 2.5, color = "black") +
+  scale_fill_viridis_c(
+  option = "plasma",
+  name = "Crimes per 1,000",
+  breaks = breaks,
+  labels = scales::label_number()(breaks)
+) +
+  scale_color_manual(values = palette_30) +
+  theme_bw()
 ```
 
