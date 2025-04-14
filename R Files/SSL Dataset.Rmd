@@ -1,0 +1,71 @@
+---
+title: "SSL"
+output: html_document
+date: "2025-04-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+
+options(scipen = 999)
+options(digits = 2)
+```
+
+```{r}
+Strategic_Subject_List_Historical_20241107 <- read_csv("Raw Data/Strategic_Subject_List_-_Historical_20241107.csv")
+```
+
+```{r}
+SSL_top20 <- Strategic_Subject_List_Historical_20241107 |>
+  mutate(District = ifelse(is.na(`IDOC CPD DIST`), `LATEST DIST`, `IDOC CPD DIST`)) |>
+  group_by(`District`) |>
+  slice_max(order_by = `HEAT SCORE`, n = 20)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+library(colorspace)
+
+palette_30 <- qualitative_hcl(30, palette = "Dark 3")  # Or try "Set 2", "Harmonic", etc.
+```
+
+```{r}
+# Step 1: Prepare data
+plot_data <- SSL_top20 |>
+  mutate(
+    medianscore = ave(`HEAT SCORE`, `District`, FUN = median),
+    counts = ave(`HEAT SCORE`, `District`, FUN = length)
+  ) |>
+  mutate(
+    label = reorder(sprintf("District %s (N=%d)", `District`, counts), `District`)
+  )
+```
+
+```{r}
+ggplot(plot_data, aes(y = label, x = `HEAT SCORE`, color = factor(`District`))) +
+  geom_boxplot(outlier.color = NA, color = "black") +
+  geom_point(position = position_jitter(height = 0.3, width = 0.01), alpha = 0.2, aes(color = factor(`District`))) +
+  scale_color_manual(values = palette_30)+
+  #scale_color_viridis_d(option = "C", direction = -1) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  geom_vline(xintercept = median(plot_data$`HEAT SCORE`, na.rm = TRUE), lty = "dashed") +
+  labs(x = "HEAT SCORE", y = "Police District (N)", title = "Distribution of HEAT SCORE by Police District")
+```
+
+```{r}
+District_population |>
+  group_by(District) |>
+  summarise(TIC = mean(TIC),
+            Crime_per_1000 = mean(Crime_per_1000))
+```
+
+

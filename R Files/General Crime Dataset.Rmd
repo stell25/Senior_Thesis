@@ -1,0 +1,75 @@
+---
+title: "General Crime Dataset"
+output: html_document
+date: "2025-04-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+
+options(scipen = 999)
+file_path <- dirname(getwd())
+```
+
+```{r}
+#load in Crime Dataset from 2010-Present
+Crimes_2010_to_Present <- read_csv(file.path(file_path, "Cleaned Data",  "Crimes_-_2010_to_Present_20241114.csv"))
+
+#load in IUCR Codes Dataset
+IUCR_Codes <- read.csv(file.path(file_path,"Raw Data", "Chicago_Police_Department_-_Illinois_Uniform_Crime_Reporting__IUCR__Codes_20250306.csv"))
+
+#Load in Illinois Crime Stats
+Illinois_Crime_Stats <- read_excel(file.path(file_path, "Raw Data", "Illinois Crime Stats.xlsx"))
+
+Crimes_2010_Present <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "IUCR") |>
+  filter(Year < 2020)
+```
+
+```{r}
+Illinois_Crime_Trends_Plot <- Illinois_Crime_Stats |>
+  filter(Year < 2020) |>
+  mutate(`Chicago Reported Rate` = (CPD_Reported_TIC /(`CPD_Reported Population`/100000)),
+         `Chicago DataPortal Rate` = (Data_Portal_TIC /(`CPD_Reported Population`/100000)),
+         `Illinois Non-Chicago Rate` = (Non_Chicago_Reported_TIC /(Non_Chicago_Population/100000)),
+         `Illinois Rate` = (Illinois_TIX_Offenses/(`Illinois_Population`/100000))) |>
+  select(Year,
+         `Chicago Reported Rate`,
+         `Chicago DataPortal Rate`,
+         `Illinois Non-Chicago Rate`,
+         `Illinois Rate`) |>
+  pivot_longer(cols = c(`Chicago Reported Rate`,
+                        `Chicago DataPortal Rate`,
+                        `Illinois Non-Chicago Rate`,
+                        `Illinois Rate`), 
+               names_to = "Area",
+               values_to = "Rate_Per_100000") |>
+ggplot(aes(x = Year, y = Rate_Per_100000, fill = Area)) +
+  geom_point(aes(color = Area), size = 1) +
+  geom_line(aes(color = Area)) +
+  scale_x_continuous(breaks = seq(2010, 2019, by = 1)) +
+  labs(title = "Illinois Crime Trends from 2010-2019",
+       x = "Year",
+       y = "Crime Per 100,000") +
+  theme(
+    legend.title = element_text(size = 18, face = "bold"),
+    legend.text = element_text(size = 16),
+    plot.title = element_text(size = 24, face = "bold"),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14)
+  )
+
+ggsave("Illinois_Crime_Trends_Plot.png", 
+       plot = Illinois_Crime_Trends_Plot,
+       width = 4,
+       height = 2.25)
+```
+

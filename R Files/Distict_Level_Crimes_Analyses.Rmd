@@ -16,6 +16,8 @@ library(colorspace)
 library(tmap)
 library(leaflet)
 library(sf)
+library(showtext)
+library(classInt)
 
 options(scipen = 999)
 file_path <- dirname(getwd())
@@ -333,35 +335,73 @@ PoliceDistrictBoundaries_Current$District <- as.integer(PoliceDistrictBoundaries
 ```
 
 ```{r}
-left_join(PoliceDistrictBoundaries_Current, District_Summaries)
-```
-
-```{r}
 ggplot(data = PoliceDistrictBoundaries_Current) +
   geom_sf(aes(geometry = geometry)) +
   labs(title = "Police District Boundaries")
 ```
-```{r}
-install.packages("classInt")
-library(classInt)
 
-# Get the breaks
+```{r}
+# Create breaks
 breaks <- classIntervals(District_Summaries$Crime_per_1000, n = 5, style = "jenks")$brks
+breaks <- breaks[2:6]
+
+# Bin the data
+District_Summaries <- District_Summaries |>
+  mutate(Crime_bin = cut(Crime_per_1000, breaks = breaks, include.lowest = TRUE))
+
+# Merge with spatial
+merged <- left_join(PoliceDistrictBoundaries_Current, District_Summaries, by = "District")
+
+# Get centroids
+centroids <- st_centroid(merged)
 ```
 
 ```{r}
-centroids <- st_centroid(PoliceDistrictBoundaries_Current
+# Font setup
+theme_set(theme_bw(base_family = "Cambria"))
 
-ggplot(left_join(PoliceDistrictBoundaries_Current, District_Summaries)) +
-  geom_sf(aes(fill = Crime_per_1000, alpha = 0.6)) +
-  geom_text(data = centroids, aes(label = District, geometry = geometry), stat = "sf_coordinates", size = 2.5, color = "black") +
-  scale_fill_viridis_c(
-  option = "plasma",
-  name = "Crimes per 1,000",
-  breaks = breaks,
-  labels = scales::label_number()(breaks)
-) +
-  scale_color_manual(values = palette_30) +
-  theme_bw()
+# Reorder and relabel factor
+merged$Crime_bin <- factor(
+  merged$Crime_bin,
+  levels = c("[0.174,39.7]", "(39.7,63.5]", "(63.5,84.1]", "(84.1,118]"),
+  labels = c("Low (Less than 40 TIC)", "Moderate (40-65 TIC)", "High (65-90 TIC)", "Very High (Over 90 TIC)")
+)
+
+p4 <- c("Low (Less than 40 TIC)" = "#4DD588",
+        "Moderate (40-65 TIC)" = "#fee08b",
+        "High (65-90 TIC)" = "#f6bb90",
+        "Very High (Over 90 TIC)" = "#E94E46")
+```
+
+```{r}
+# Plot
+plot <- ggplot(merged) +
+  geom_sf(aes(fill = Crime_bin), color = "white", size = 0.3) +
+  geom_text(
+    data = centroids,
+    aes(label = District, geometry = geometry),
+    stat = "sf_coordinates",
+    size = 4,
+    color = "black"
+  ) +
+  scale_fill_manual(
+    values = p4,
+    name = "Crime Rate"
+  ) +
+  labs(title = "Map of Chicago Districts and Crime Rate per 1,000") +
+  #theme_bw(base_family = "Cambria") +
+  theme(
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )
+
+ggsave("Chicago_Districts_and_Crime_Rate.png", 
+       plot = plot,
+       width = 4,
+       height = 3)
 ```
 
