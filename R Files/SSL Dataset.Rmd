@@ -12,33 +12,107 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 library(readr)
+library(dplyr)
+library(RColorBrewer)
+library(colorspace)
 
 options(scipen = 999)
 options(digits = 2)
+file_path <- dirname(getwd())
+palette_30 <- qualitative_hcl(30, palette = "Dark 3")  # Or try "Set 2", "Harmonic", etc.
 ```
 
 ```{r}
-Strategic_Subject_List_Historical_20241107 <- read_csv("Raw Data/Strategic_Subject_List_-_Historical_20241107.csv")
+#load in SSL Dataset
+Strategic_Subject_List_Historical <- read_csv(file.path(file_path, "Raw Data",  "Strategic_Subject_List_-_Historical_20241107.csv"))
 ```
 
 ```{r}
-SSL_top20 <- Strategic_Subject_List_Historical_20241107 |>
-  mutate(District = ifelse(is.na(`IDOC CPD DIST`), `LATEST DIST`, `IDOC CPD DIST`)) |>
+#Standardize Districts
+Strategic_Subject_List_Historical <- Strategic_Subject_List_Historical |>
+  mutate(District = `LATEST DIST RES`) |>
+  #consolidate district 13 into 12
+  mutate(District = ifelse((District == 13), 12, District)) |>
+  #consolidate district 21 into 2
+  mutate(District = ifelse((District == 21), 2, District)) |>
+  #consolidate district 23 into 19
+  mutate(District = ifelse((District == 23), 19, District)) 
+
+```
+
+----------------------
+#Summary Statistics
+-----------------------
+
+```{r}
+#Mean and Median of SSL Score by District
+SSL_stats <- Strategic_Subject_List_Historical |>
+  group_by(District) |>
+  summarise(Count = n(),
+            Mean = mean(`SSL SCORE`),
+            Median = median(`SSL SCORE`))
+
+write.csv(SSL_stats, "SSL_stats.csv")
+```
+
+```{r}
+Strategic_Subject_List_Historical |>
+  summarise(min = min(`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`),
+            max = max(`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`))
+```
+```{r}
+#252670 have a majority dist
+#141973	have a majority district that doesn't match their district of residence
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(`MAJORITY DIST`) |>
+  summarise(count = n())
+
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(District) |>
+  summarise(count = n())
+  
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(`MAJORITY DIST`, District) |>
+  summarise(count = n())
+```
+
+----------------------
+#Box and Whisker Plot
+---------------------
+```{r}
+SSL_top20_stats <- Strategic_Subject_List_Historical |>
+  group_by(`District`) |>
+  slice_max(order_by = `HEAT SCORE`, n = 20)|>
+  group_by(District) |>
+  summarise(
+    Q1 = quantile(`SSL SCORE`, 0.25, na.rm = TRUE),
+    Median = median(`SSL SCORE`, na.rm = TRUE),
+    Q3 = quantile(`SSL SCORE`, 0.75, na.rm = TRUE),
+    Mean = mean(`SSL SCORE`, na.rm = TRUE),
+    count = n()
+  )
+
+write.csv(SSL_top20_stats, "SSL_top20_stats.csv")
+```
+
+```{r}
+SSL_top20 <- Strategic_Subject_List_Historical |>
   group_by(`District`) |>
   slice_max(order_by = `HEAT SCORE`, n = 20)
 ```
 
 ```{r}
-library(dplyr)
-library(ggplot2)
-library(RColorBrewer)
-library(colorspace)
-
-palette_30 <- qualitative_hcl(30, palette = "Dark 3")  # Or try "Set 2", "Harmonic", etc.
-```
-
-```{r}
 # Step 1: Prepare data
+
 plot_data <- SSL_top20 |>
   mutate(
     medianscore = ave(`HEAT SCORE`, `District`, FUN = median),
@@ -50,15 +124,26 @@ plot_data <- SSL_top20 |>
 ```
 
 ```{r}
-ggplot(plot_data, aes(y = label, x = `HEAT SCORE`, color = factor(`District`))) +
+Heat_Score_Distribution <- ggplot(plot_data, aes(y = label, x = `HEAT SCORE`, color = factor(`District`))) +
   geom_boxplot(outlier.color = NA, color = "black") +
-  geom_point(position = position_jitter(height = 0.3, width = 0.01), alpha = 0.2, aes(color = factor(`District`))) +
+  geom_point(position = position_jitter(height = 0.3, width = 0.01), alpha = 0.7, aes(color = factor(`District`))) +
   scale_color_manual(values = palette_30)+
   #scale_color_viridis_d(option = "C", direction = -1) +
   theme_bw() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        plot.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold")) +  
   geom_vline(xintercept = median(plot_data$`HEAT SCORE`, na.rm = TRUE), lty = "dashed") +
   labs(x = "HEAT SCORE", y = "Police District (N)", title = "Distribution of HEAT SCORE by Police District")
+
+ggsave("Heat_Score_Distribution.png", 
+       plot = Heat_Score_Distribution,
+       width = 4,
+       height = 6, 
+       dpi = 500)
+
+#Median is 479
 ```
 
 ```{r}
@@ -67,5 +152,53 @@ District_population |>
   summarise(TIC = mean(TIC),
             Crime_per_1000 = mean(Crime_per_1000))
 ```
+-----------------
+#SSL FLAGS - interactions with Police Units
+------------------
 
+```{r}
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`SSL FLAGS`)) |>
+  group_by(District) |>
+  summarise(count = n())
+
+  group_by(`SSL FLAGS`) |>
+  summarize(count = n())
+```
+-----------------------------
+#AGE
+-----------------------------
+
+```{r}
+#Distribution of top 20 SSL
+SSL_top20 |>
+  group_by(`AGE GROUP`) |>
+    summarise(
+    Q1 = quantile(`SSL SCORE`, 0.25, na.rm = TRUE),
+    Median = median(`SSL SCORE`, na.rm = TRUE),
+    Q3 = quantile(`SSL SCORE`, 0.75, na.rm = TRUE),
+    Mean = mean(`SSL SCORE`, na.rm = TRUE),
+    count = n()
+  )
+```
+
+```{r}
+#Age distribution of full SSL dataset
+Strategic_Subject_List_Historical |>
+  group_by(`AGE GROUP`) |>
+    summarise(
+    Q1 = quantile(`SSL SCORE`, 0.25, na.rm = TRUE),
+    Median = median(`SSL SCORE`, na.rm = TRUE),
+    Q3 = quantile(`SSL SCORE`, 0.75, na.rm = TRUE),
+    Mean = mean(`SSL SCORE`, na.rm = TRUE),
+    count = n()
+  )
+```
+
+---------------------
+#Predictors
+---------------------
+```{r}
+
+```
 
