@@ -20,7 +20,7 @@ library(showtext)
 library(classInt)
 
 options(scipen = 999)
-file_path <- dirname(getwd())
+file_path <- file.path(dirname(getwd()), "Thesis")
 file_path
 palette_30 <- qualitative_hcl(30, palette = "Dark 3")  # Or try "Set 2", "Harmonic", etc.
 ```
@@ -34,7 +34,12 @@ IUCR_Codes <- read.csv(file.path(file_path,"Raw Data", "Chicago_Police_Departmen
 
 #load in District Population Dataset
 District_Population_Ethnicity <- read.csv(file.path(file_path,"Cleaned Data", "District Population and Ethnicity.csv"))
+
+Crimes_2010_Present_TIC <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "IUCR") |>
+  filter(Year < 2020) |>
+  filter(INDEX.CODE == "I")
 ```
+
 
 --------------------------------------------------------------------------------
 #District Breakdown
@@ -100,6 +105,15 @@ write.csv(District_population, "District_level.csv")
 ```
 
 ```{r}
+District_population |>
+  filter(District != 31) |>
+  pivot_longer(cols = c(Crime_per_1000, TIC), names_to = 'Type', values_to = 'Count') |>
+  ggplot(aes(x = Year, y = Count, color = Type)) +  # use color for line plot
+  geom_line() +
+  facet_wrap(~ District)
+```
+
+```{r}
 #Averages Total Crime and Total Index Crime across 2010-2019 for each district
 District_population |>
   group_by(District) |>
@@ -152,8 +166,8 @@ ggplot(District_population, aes(x = Year, y = Crime_per_1000, color = factor(Dis
 ```{r}
 Year_Crimes <- Crimes_2010_Present |>
   group_by(Year) |>
-  summarise(Total_Crime = n_distinct(Case.Number),
-            Violent = sum(Violent.y == 1, na.rm = TRUE),
+  summarise(Total_Crime = n(),
+            Violent = sum(Violent == 1, na.rm = TRUE),
             Arrests = sum(Arrest == 'false', na.rm = TRUE),
             Crime_to_Arrest_Ratio = Violent / Arrests)
 ```
@@ -162,13 +176,13 @@ Year_Crimes <- Crimes_2010_Present |>
 ```{r}
 Year_Crimes_NOT <- Crimes_2010_Present |>
   filter(District != 31) |>
-  filter(!Primary.Type %in% c("HOMICIDE", "CRIMINAL SEXUAL ASSAULT", "ROBBERY", 
+  filter(!`Primary Type` %in% c("HOMICIDE", "CRIMINAL SEXUAL ASSAULT", "ROBBERY", 
                              "BATTERY", "ASSAULT", "BURGLARY", "THEFT", 
                              "MOTOR VEHICLE THEFT", "ARSON", "HUMAN TRAFFICKING")) |>
   group_by(Year) |>
   summarise(
-    Total_Crime = n_distinct(Case.Number),
-    Violent = sum(Violent.y == 1, na.rm = TRUE),
+    Total_Crime = n(),
+    Violent = sum(Violent == 1, na.rm = TRUE),
     Arrests = sum(Arrest == TRUE, na.rm = TRUE),  # or Arrest == FALSE if you meant non-arrests
     Crime_to_Arrest_Ratio = Violent / Arrests
   )
@@ -178,7 +192,7 @@ Year_Crimes_NOT <- Crimes_2010_Present |>
 ```{r}
 District_Crime_Level <- Crimes_2010_Present |>
   group_by(District) |>
-  summarise(Violent = sum(Violent.y == 1, na.rm = TRUE),
+  summarise(Violent = sum(Violent == 1, na.rm = TRUE),
             Arrests = sum(Arrest == 'false', na.rm = TRUE),
             Crime_to_Arrest_Ratio = Violent / Arrests) |>
   #calculate the z-score, how many sd away from the mean
@@ -212,6 +226,7 @@ ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) 
        linetype = "District") +
   theme_minimal()
 ```
+
 ```{r}
 top_3 <- District_Crime_Level_Year %>%
   filter(Year == 2020) %>%
@@ -232,20 +247,22 @@ ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) 
 ```
 
 ```{r}
-Strategic_Subject_List_Historical <- read_csv("~/2025 Spring/Thesis/Strategic_Subject_List_-_Historical_20241107.csv")
+#Strategic_Subject_List_Historical <- read_csv("~/2025 Spring/Thesis/Strategic_Subject_List_-_Historical_20241107.csv")
 ```
 
 ```{r}
-left_join(SSL_District, SSL_top50)
 
-ggplot(left_join(SSL_District, SSL_top50), aes(x = District, y = mean)) +
-  geom_line() +  
-  scale_color_viridis_d(option = "turbo") +  
-  scale_x_continuous(breaks = seq(1, 25, by = 1))
-  labs(title = "SSL Top 50 Mean by District",
-       x = "District",
-       y = "Mean of top 50 individuals with the highest SSL score") +
-  theme_minimal()
+#left_join(SSL_District, SSL_top50)
+
+#ggplot(left_join(SSL_District, SSL_top50), aes(x = District, y = mean)) +
+#  geom_line() +  
+#  scale_color_viridis_d(option = "turbo") +  
+#  scale_x_continuous(breaks = seq(1, 25, by = 1))
+#  labs(title = "SSL Top 50 Mean by District",
+#       x = "District",
+#       y = "Mean of top 50 individuals with the highest SSL score") +
+#  theme_minimal()
+
 ```
 
 ----------------------------
@@ -349,12 +366,57 @@ ggsave("Chicago_Districts_and_Crime_Rate.png",
        height = 3)
 ```
 
+```{r}
+# Merge with spatial, no bins
+merged2 <- left_join(PoliceDistrictBoundaries_Current, District_Summaries, by = "District")
+
+# Get centroids
+centroids <- st_centroid(merged2)
+```
+
+```{r}
+theme_set(theme_bw(base_family = "Cambria"))
+
+# Plot
+#plot <- 
+  ggplot(merged2) +
+  geom_sf(aes(fill = Crime_per_1000), color = "white", size = 0.3) +
+  geom_text(
+    data = centroids,
+    aes(label = District, geometry = geometry),
+    stat = "sf_coordinates",
+    size = 4,
+    color = "black"
+  ) +
+scale_fill_gradientn(
+  colors = c("#1a9850", "#fee08b", "#d73027"),  # Green → Yellow → Red
+  name = "Crime per 1,000",
+  limits = range(merged2$Crime_per_1000, na.rm = TRUE),
+  na.value = "grey90"
+) +
+  labs(title = "Map of Chicago Districts and Crime Rate per 1,000") +
+  theme(
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )
+
+#ggsave("Chicago_Districts_and_Crime_Rate.png", 
+#       plot = plot,
+#       width = 4,
+#       height = 3)
+
+```
+
 -----------------
 #Year Breakdown
 ```{r}
 Year_Crimes <- Crimes_2010_Present |>
   group_by(Year) |>
-  summarise(Violent = sum(Violent.y == 1, na.rm = TRUE),
+  summarise(Violent = sum(Violent == 1, na.rm = TRUE),
             Arrests = sum(Arrest == 'false', na.rm = TRUE),
             Crime_to_Arrest_Ratio = Violent / Arrests) |>
   #calculate the z-score, how many sd away from the mean
@@ -365,16 +427,89 @@ Year_Crimes <- Crimes_2010_Present |>
   mutate(z_scores = Violent_Z + Arrests_Z)
 ```
 
+```{r}
+overall_trend <- District_population |>
+  group_by(Year) |>
+  summarise(mean = mean(Crime_per_1000))
+
+ggplot(District_population, aes(x = Year, y = Crime_per_1000, group = District)) +
+  geom_line(color = "#0072B2", size = 0.7) +  # Clear blue for all district lines
+  geom_line(
+    data = overall_trend,
+    aes(x = Year, y = mean),
+    inherit.aes = FALSE,
+    color = "black",
+    linetype = "dashed",
+    size = 0.7
+  ) +  # Dotted black line for overall trend
+  facet_wrap(~ District, ncol = 3) +
+  labs(
+    title = "Crime Rates per 1,000 by District",
+    x = "Year",
+    y = "Crime per 1,000"
+  ) +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.text = element_text(size = 15, face = "bold"),
+    axis.title = element_text(size = 20, face = "bold")
+  )
+
+#ggsave("plot.jpg",
+#       plot=  plot,
+#       width = 3.5,
+#       height = 7)
+```
+
 --------------------------------------
-#District - Specific
+#District - Arrest Ratios
 --------------------------------------
 
 ```{r}
-#District 1
 Crimes_2010_Present_TIC |>
-  group_by()
+  group_by(Year, District) |>
+  summarise(Violent = sum(Violent == "1", na.rm = TRUE),
+            Arrests = sum(Arrest == 'TRUE', na.rm = TRUE),
+            Crime_to_Arrest_Ratio = Violent / Arrests)
+```
+```{r}
+Crimes_2010_Present_TIC |>
+  filter(INDEX.CODE == "I") |>
+  group_by(Year, District) |>
+  summarise(count = n(),
+            Arrests = sum(Arrest == 'TRUE', na.rm = TRUE),
+            Crime_to_Arrest = count / Arrests) |>
+  ggplot(aes(x = Year, y = Crime_to_Arrest)) +
+  geom_line() +
+  facet_wrap(~District)
+
+#A higher value means fewer arrests relative to crime (i.e., more crimes happen before an arrest is made). A lower value means more arrests relative to crime (i.e., fewer crimes per arrest).
 ```
 
+```{r}
+
+TIC_arrests_ratio <- Crimes_2010_Present_TIC |>
+  filter(INDEX.CODE == "I") |>
+  group_by(Year, District) |>
+  summarise(count = n(),
+            Arrests = sum(Arrest == 'TRUE', na.rm = TRUE),
+            Crime_to_Arrest_Ratio = count / Arrests) |>
+  filter(!is.na(Crime_to_Arrest_Ratio), is.finite(Crime_to_Arrest_Ratio))
+
+ggplot(TIC_arrests_ratio, aes(x = Year, y = factor(District), fill = Crime_to_Arrest_Ratio)) +
+  geom_tile() +
+  scale_x_continuous(breaks = unique(TIC_arrests_ratio$Year))+
+  scale_fill_gradientn(
+    colors = c("#1a9850", "#fee08b", "#d73027"),  # Green → Yellow → Red
+    name = "Crime to Arrest Ratio",
+    limits = range(TIC_arrests_ratio$Crime_to_Arrest_Ratio, na.rm = TRUE),
+    na.value = "grey90"
+  ) +
+  theme_minimal() +
+  labs(title = "Crime to Arrest Ratio Heatmap",
+       x = "Year",
+       y = "District")
+
+```
 
 --------------------------------------
 #COPA Complaints
@@ -383,12 +518,15 @@ Crimes_2010_Present_TIC |>
 ```{r}
 #COPA COMPLAINTS
 
+COPA_Cases_._By_Involved_Officer_20241120 <- read_csv(file.path(file_path,"Raw Data", "COPA_Cases_-_By_Involved_Officer_20241120.csv"))
+
 BIA_Cases_By_Involved_Officer <- read_csv(file.path(file_path,"Raw Data", "BIA_Cases_-_By_Involved_Officer_20250327.csv"))
 ```
 
 ```{r}
 COPA_Cases_._By_Involved_Officer_20241120 |>
-  filter(as.POSIXct(COMPLAINT_DATE, "%m/%d/%Y %I:%M:%S %p") > 01/01/2010)
+  mutate(COMPLAINT_DATE = as.POSIXct(COMPLAINT_DATE, format = "%m/%d/%Y %I:%M:%S %p")) |>
+  filter(COMPLAINT_DATE > 01/01/2010)
 ```
 
 ```{r}
@@ -409,29 +547,262 @@ COPA_BIA_complaints <- left_join(COPA_Cases_._By_Involved_Officer_20241120, BIA_
   #select combined columns
   select(LOG_NO, COMPLAINT_DATE, ASSIGNMENT, CASE_TYPE, CURRENT_STATUS, CURRENT_CATEGORY, FINDING_CODE, POLICE_SHOOTING, BEAT, RACE_OF_INVOLVED_OFFICER, SEX_OF_INVOLVED_OFFICER, AGE_OF_INVOLVED_OFFICER, YEARS_ON_FORCE_OF_INVOLVED_OFFICER, COMPLAINT_YEAR) |>
   #filter complaints from 2010-2020
-  filter(COMPLAINT_YEAR >= 2010 & COMPLAINT_YEAR <= 2020) |>
-  #standardize beat column and create police district column
-  mutate(BEAT = ifelse(nchar(as.character(BEAT)) != 4, 
-                             paste0("0", BEAT), 
-                             as.character(BEAT))) |>
-  mutate(DISTRICT = substr(BEAT, 1, 2))
+  filter(COMPLAINT_YEAR >= 2010 & COMPLAINT_YEAR <= 2020)|>
+  filter(BEAT != "Unknown") |>
+  filter(BEAT != "6100") |>
+  # Separate multiple beats into multiple rows
+  separate_rows(BEAT, sep = " \\| ") |>
+  # Clean white space
+  mutate(BEAT = str_trim(BEAT)) |>
+  #filter out cases with District == 0 
+  filter(BEAT != "0") |>
+  filter(!is.na(BEAT)) |>
+  # Add leading zero if beat is only 3 digits
+  mutate(BEAT = if_else(nchar(BEAT) == 3, paste0("0", BEAT), BEAT)) |>
+  # Extract district: first two digits
+  mutate(DISTRICT = substr(BEAT, 1, 2)) |>
+  mutate(DISTRICT = ifelse((DISTRICT == 13), 12, DISTRICT)) |>
+  #consolidate district 21 into 2
+  mutate(DISTRICT = ifelse((DISTRICT == 21), 2, DISTRICT)) |>
+  #consolidate district 23 into 19
+  mutate(DISTRICT = ifelse((DISTRICT == "23"), 19, DISTRICT)) |>
+  mutate(DISTRICT = ifelse((DISTRICT == "2"), "02", DISTRICT)) 
+
+#81464 total complaints logged
+#37810 after filtering out complaints with NA beats
+#37370 after filtering out rest of non loggable beats
 ```
 
 ```{r}
-COPA_BIA_complaints |>
-  group_by(CASE_TYPE) |>
-  summarise(count = n())
-```
-
-```{r}
-COPA_BIA_complaints |>
-  #filters out na cases (42477 of the entries, 52%)
-  filter(!is.na(CASE_TYPE)) |>
-  #filters out complaint with no registered beat
-  filter(DISTRICT != "00" ) |>
+test <- COPA_BIA_complaints |>
   group_by(DISTRICT, COMPLAINT_YEAR) |>
-  summarise(Count = n())
+  summarise(count = n())
+
+test <- test |>
+  group_by(COMPLAINT_YEAR) |>
+  summarise(Count = median(count)) |>
+  mutate(DISTRICT = "All") |>
+  select(DISTRICT, COMPLAINT_YEAR, Count)
 ```
+
+```{r}
+
+#Overall median of complaints for each district: 1289
+#Overall mean of complaints for each district: 1384
+
+COPA_BIA_complaints_counts <- COPA_BIA_complaints |>
+  group_by(DISTRICT, COMPLAINT_YEAR) |>
+  summarise(Count = n()) 
+
+COPA_BIA_complaints_counts |>
+  group_by(DISTRICT) |>
+  summarize(median = median(Count))
+```
+
+```{r}
+district_levels_1 <- c("All", "01", "02", "03", "04", "05")
+
+rbind(COPA_BIA_complaints_counts, test) |>
+  filter(DISTRICT %in% district_levels_1) |>
+  mutate(DISTRICT = factor(DISTRICT, levels = district_levels_1)) |>
+  ggplot(aes(x = COMPLAINT_YEAR, y = Count, color = DISTRICT, linetype = DISTRICT)) +
+  geom_point(size = 1.3) +
+  geom_line(width = 1.15) +
+  scale_color_manual(
+    values = c("All" = "black", 
+               "01" = "#1f77b4", 
+               "02" = "#ff7f0e", 
+               "03" = "#2ca02c", 
+               "04" = "#d62728", 
+               "05" = "#9467bd")
+  ) +
+  scale_linetype_manual(
+    values = c("All" = "dashed", 
+               "01" = "solid",
+               "02" = "solid",
+               "03" = "solid",
+               "04" = "solid",
+               "05" = "solid")
+  ) +
+  scale_x_continuous(breaks = 2010:2019, limits = c(2010, 2019))+
+  scale_y_continuous(limits = c(0, 600))+
+  guides(
+    color = guide_legend(
+      override.aes = list(
+        color = c("black", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"),
+        linetype = c("dashed", "solid", "solid", "solid", "solid", "solid")
+      )
+    ),
+    linetype = "none"
+  ) +
+  labs(title = "COPA/BIA Complaints Over Time for District 1-5",
+       x = "Year",
+       y = "Number of Complaints",
+       color = "District") +
+  theme(
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.text = element_text(size = 15, face = "bold"),
+    axis.title = element_text(size = 20, face = "bold")
+  )
+```
+
+```{r}
+district_levels_2 <- c("All", "06", "07", "08", "09", "10", "11")
+
+rbind(COPA_BIA_complaints_counts, test) |>
+  filter(DISTRICT %in% district_levels_2) |>
+  mutate(DISTRICT = factor(DISTRICT, levels = district_levels_2)) |>
+  ggplot(aes(x = COMPLAINT_YEAR, y = Count, color = DISTRICT, linetype = DISTRICT)) +
+  geom_point(size = 1.3) +
+  geom_line(width = 1.15) +
+scale_color_manual(
+  values = c("All" = "black", 
+             "06" = "#1f77b4", 
+             "07" = "#ff7f0e", 
+             "08" = "#2ca02c", 
+             "09" = "#d62728", 
+             "10" = "#9467bd",
+             "11" = "#17becf")
+)+
+scale_linetype_manual(
+  values = c("All" = "dashed", 
+             "06" = "solid",
+             "07" = "solid",
+             "08" = "solid",
+             "09" = "solid",
+             "10" = "solid",
+             "11" = "solid")
+)+
+  scale_x_continuous(breaks = 2010:2019, limits = c(2010, 2019))+
+  scale_y_continuous(limits = c(0, 600))+
+  guides(
+    color = guide_legend(
+      override.aes = list(
+        color = c("black", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#17becf"),
+        linetype = c("dashed", "solid", "solid", "solid", "solid", "solid", "solid")
+      )
+    ),
+    linetype = "none"
+  ) +
+  labs(title = "COPA/BIA Complaints Over Time for District 6-11",
+       x = "Year",
+       y = "Number of Complaints",
+       color = "District") +
+    theme(
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.text = element_text(size = 15, face = "bold"),
+    axis.title = element_text(size = 20, face = "bold")
+  )
+
+```
+
+```{r}
+district_levels_3 <- c("All", "12", "14", "15", "16", "17", "18")
+
+rbind(COPA_BIA_complaints_counts, test) |>
+  filter(DISTRICT %in% district_levels_3) |>
+  mutate(DISTRICT = factor(DISTRICT, levels = district_levels_3)) |>
+  ggplot(aes(x = COMPLAINT_YEAR, y = Count, color = DISTRICT, linetype = DISTRICT)) +
+  geom_point(size = 1.3) +
+  geom_line(width = 1.15) +
+scale_color_manual(
+  values = c("All" = "black", 
+             "12" = "#1f77b4", 
+             "14" = "#ff7f0e", 
+             "15" = "#2ca02c", 
+             "16" = "#d62728", 
+             "17" = "#9467bd",
+             "18" = "#17becf")
+)+
+scale_linetype_manual(
+  values = c("All" = "dashed", 
+             "12" = "solid",
+             "14" = "solid",
+             "15" = "solid",
+             "16" = "solid",
+             "17" = "solid",
+             "18" = "solid")
+)+
+  scale_x_continuous(breaks = 2010:2019, limits = c(2010, 2019))+
+  scale_y_continuous(limits = c(0, 600)) +
+  guides(
+    color = guide_legend(
+      override.aes = list(
+        color = c("black", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#17becf"),
+        linetype = c("dashed", "solid", "solid", "solid", "solid", "solid", "solid")
+      )
+    ),
+    linetype = "none"
+  ) +
+  labs(title = "COPA/BIA Complaints Over Time for District 12-18",
+       x = "Year",
+       y = "Number of Complaints",
+       color = "District") +
+    theme(
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.text = element_text(size = 15, face = "bold"),
+    axis.title = element_text(size = 20, face = "bold")
+  )
+```
+
+```{r}
+district_levels_4 <- c("All", "19", "20", "22", "24", "25", "31")
+
+rbind(COPA_BIA_complaints_counts, test) |>
+  filter(DISTRICT %in% district_levels_4) |>
+  mutate(DISTRICT = factor(DISTRICT, levels = district_levels_4)) |>
+  ggplot(aes(x = COMPLAINT_YEAR, y = Count, color = DISTRICT, linetype = DISTRICT)) +
+  geom_point(size = 1.3) +
+  geom_line(width = 1.15) +
+scale_color_manual(
+  values = c("All" = "black", 
+             "19" = "#1f77b4", 
+             "20" = "#ff7f0e", 
+             "22" = "#2ca02c", 
+             "24" = "#d62728", 
+             "25" = "#9467bd",
+             "31" = "#17becf")
+)+
+scale_linetype_manual(
+  values = c("All" = "dashed", 
+             "19" = "solid",
+             "20" = "solid",
+             "22" = "solid",
+             "24" = "solid",
+             "25" = "solid",
+             "31" = "solid")
+)+
+  scale_x_continuous(breaks = 2010:2019, limits = c(2010, 2019))+
+  scale_y_continuous(limits = c(0, 600))+
+  guides(
+    color = guide_legend(
+      override.aes = list(
+        color = c("black", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#17becf"),
+        linetype = c("dashed", "solid", "solid", "solid", "solid", "solid", "solid")
+      )
+    ),
+    linetype = "none"
+  ) +
+  labs(title = "COPA/BIA Complaints Over Time for District 19-25, 31",
+       x = "Year",
+       y = "Number of Complaints",
+       color = "District") +
+    theme(
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.text = element_text(size = 15, face = "bold"),
+    axis.title = element_text(size = 20, face = "bold")
+  )
+```
+
+
 ```{r}
 COPA_BIA_complaints |>
   #filters out na cases (42477 of the entries, 52%)
@@ -440,7 +811,7 @@ COPA_BIA_complaints |>
   filter(DISTRICT != "00" ) |>
   group_by(DISTRICT, COMPLAINT_YEAR) |>
   summarise(Count = n()) |>
-ggplot()+
+ggplot(aes(x = COMPLAINT_YEAR, y = Count, fill = DISTRICT))+
   geom_line(aes(color = DISTRICT))
 ```
 

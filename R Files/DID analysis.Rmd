@@ -21,7 +21,7 @@ View(Illinois_Crime_Stats)
 
 ```{r}
 # DID analysis - using CPD reported Crime statistics
-reported_DID <- Illinois_and_National_Crime_Stats |>
+reported_DID <- Illinois_Crime_Stats |>
   filter(Year != 2020) |>
   select(Year, Non_Chicago_Reported_TIC, CPD_Reported_TIC) |>
   rename(Non_Chicago = Non_Chicago_Reported_TIC,
@@ -59,11 +59,11 @@ stargazer(didreg, type = "latex", out = "DID_results.tex")  # To export LaTeX
 
 ```{r}
 # DID analysis - using CPD reported Crime Rate for population
-reported_rate_DID <- Illinois_and_National_Crime_Stats |>
+reported_rate_DID <- Illinois_Crime_Stats |>
   filter(Year != 2020) |>
   select(Year, Illinois_TIX_Offenses, Illinois_Population, Non_Chicago_Reported_TIC, Non_Chicago_Population, CPD_Reported_TIC, `CPD_Reported Population`) |>
-  mutate(Non_Chicago_CrimePer = Non_Chicago_Reported_TIC/(Non_Chicago_Population/1000),
-         Chicago_CrimePer = CPD_Reported_TIC/(`CPD_Reported Population`/1000)) |>
+  mutate(Non_Chicago_CrimePer = Non_Chicago_Reported_TIC/(Non_Chicago_Population/100000),
+         Chicago_CrimePer = CPD_Reported_TIC/(`CPD_Reported Population`/100000)) |>
   select(Year, Non_Chicago_CrimePer, Chicago_CrimePer)
 ```
 

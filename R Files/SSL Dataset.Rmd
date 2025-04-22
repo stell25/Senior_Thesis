@@ -84,6 +84,14 @@ Strategic_Subject_List_Historical |>
   group_by(`MAJORITY DIST`, District) |>
   summarise(count = n())
 ```
+```{r}
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(`MAJORITY DIST`, District) |>
+  summarise(count = n())
+```
 
 ----------------------
 #Box and Whisker Plot
