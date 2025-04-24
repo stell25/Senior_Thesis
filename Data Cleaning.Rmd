@@ -1,0 +1,44 @@
+---
+title: "Dataset Cleaning"
+output: html_document
+date: "2025-04-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+
+options(scipen = 999)
+file_path <- dirname(getwd())
+```
+
+```{r}
+#load in Crime Dataset from 2010-Present
+Crimes_2010_to_Present <- read_csv(file.path(file_path, "Cleaned Data",  "Crimes_-_2010_to_Present_20241114.csv"))
+
+#load in IUCR Codes Dataset
+IUCR_Codes <- read.csv(file.path(file_path,"Raw Data", "Chicago_Police_Department_-_Illinois_Uniform_Crime_Reporting__IUCR__Codes_20250306.csv"))
+
+Crimes_2010_Present_TIC <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "IUCR") |>
+  filter(Year < 2020) |>
+  filter(INDEX.CODE == "I")
+```
+
+```{r}
+#Create TIC counts for Each District from 2010-2019
+Year_District_Crimes_TIC <- Crimes_2010_Present_TIC |>
+  #INDEX.CODE (from the IUCR) dataset indicates if crimes are used in TIC Count
+  filter(INDEX.CODE == "I") |>
+  group_by(District, Year) |>
+  summarise(
+    TIC = n_distinct(`Case Number`),
+    Violent = sum(Violent == 1, na.rm = TRUE),
+    Arrests = sum(Arrest == TRUE, na.rm = TRUE))
+```
+
+

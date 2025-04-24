@@ -102,6 +102,7 @@ coef(model)/100
 
 each 0.01 increase in RAW.SSL.SCORE is a 54.41 increase in SSL Score, maxed at 500
 ```
+
 ```{r}
 Strategic_Subject_List_._Historical_20241107 |>
   filter(HEAT.SCORE == 498) |>
@@ -112,6 +113,7 @@ Strategic_Subject_List_._Historical_20241107 |>
 499: 12.660
 500: 12.669
 ```
+
 ```{r}
 model <- lm(RAW.SSL.SCORE ~ HEAT.SCORE, 
             data = (Strategic_Subject_List_._Historical_20241107 |>
@@ -120,3 +122,8 @@ model <- lm(RAW.SSL.SCORE ~ HEAT.SCORE,
 coef(model)
 1 point increase in heat score due to a 0.0001837578 increase in HEAT.SCORE
 ```
+
+```{r}
+unique(Strategic_Subject_List_._Historical_20241107$DLST)
+```
+

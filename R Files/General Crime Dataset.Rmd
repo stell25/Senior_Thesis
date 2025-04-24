@@ -32,8 +32,39 @@ Illinois_Crime_Stats <- read_excel(file.path(file_path, "Raw Data", "Illinois Cr
 Crimes_2010_Present <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "IUCR") |>
   filter(Year < 2020)
 ```
-
 ```{r}
+Illinois_Crime_Stats |>
+  filter(Year < 2020) |>
+  mutate(`Chicago Reported Rate` = (CPD_Reported_TIC /(`CPD_Reported Population`/100000)),
+         `Chicago DataPortal Rate` = (Data_Portal_TIC /(`CPD_Reported Population`/100000)),
+         `Illinois Non-Chicago Rate` = (Non_Chicago_Reported_TIC /(Non_Chicago_Population/100000)),
+         `Illinois Rate` = (Illinois_TIX_Offenses/(`Illinois_Population`/100000))) |>
+  select(Year,
+         `Chicago Reported Rate`,
+         `Chicago DataPortal Rate`,
+         `Illinois Non-Chicago Rate`,
+         `Illinois Rate`) |>
+  pivot_longer(cols = c(`Chicago Reported Rate`,
+                        `Chicago DataPortal Rate`,
+                        `Illinois Non-Chicago Rate`,
+                        `Illinois Rate`), 
+               names_to = "Area",
+               values_to = "Rate_Per_100000") |>
+ggplot(aes(x = Year, y = Rate_Per_100000, fill = Area)) +
+  geom_point(aes(color = Area), size = 1.2) +
+  geom_line(aes(color = Area), size = 1) +
+  scale_x_continuous(breaks = seq(2010, 2019, by = 1)) +
+  labs(title = "Illinois Crime Trends from 2010-2019",
+       x = "Year",
+       y = "Crime Per 100,000") +
+  theme(
+    legend.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
+  )
+```
+
+
+```{r, eval = FALSE}
 Illinois_Crime_Trends_Plot <- Illinois_Crime_Stats |>
   filter(Year < 2020) |>
   mutate(`Chicago Reported Rate` = (CPD_Reported_TIC /(`CPD_Reported Population`/100000)),
@@ -52,20 +83,20 @@ Illinois_Crime_Trends_Plot <- Illinois_Crime_Stats |>
                names_to = "Area",
                values_to = "Rate_Per_100000") |>
 ggplot(aes(x = Year, y = Rate_Per_100000, fill = Area)) +
-  geom_point(aes(color = Area), size = 1) +
-  geom_line(aes(color = Area)) +
+  geom_point(aes(color = Area), size = 1.2) +
+  geom_line(aes(color = Area), size = 1) +
   scale_x_continuous(breaks = seq(2010, 2019, by = 1)) +
   labs(title = "Illinois Crime Trends from 2010-2019",
        x = "Year",
        y = "Crime Per 100,000") +
   theme(
-    legend.title = element_text(size = 18, face = "bold"),
-    legend.text = element_text(size = 16),
-    plot.title = element_text(size = 24, face = "bold"),
-    axis.title.x = element_text(size = 16),
-    axis.title.y = element_text(size = 16),
-    axis.text.x = element_text(size = 14),
-    axis.text.y = element_text(size = 14)
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
   )
 
 ggsave("Illinois_Crime_Trends_Plot.png", 
@@ -78,7 +109,7 @@ ggsave("Illinois_Crime_Trends_Plot.png",
 #DIFFERENCE IN DIFFERENCE ANALYSIS
 -----------------------------------------------------
 
-```{r}
+```{r, eval = FALSE}
 reported_population <- Illinois_Crime_Stats |>
   filter(Year != 2020) |>
   select(Year, Non_Chicago_Population, `CPD_Reported Population`) |>
@@ -89,7 +120,7 @@ reported_population <- Illinois_Crime_Stats |>
                values_to = "Population")
 ```
 
-```{r}
+```{r, eval = FALSE}
 # DID analysis - using CPD reported Crime statistics
 reported_DID <- Illinois_Crime_Stats |>
   filter(Year != 2020) |>
@@ -98,7 +129,7 @@ reported_DID <- Illinois_Crime_Stats |>
          Chicago = CPD_Reported_TIC)
 ```
 
-```{r}
+```{r, eval = FALSE}
 reported_DID <- reported_DID |>
   pivot_longer(cols = c(Non_Chicago, Chicago), names_to = "Area") |>
   #create a dummy variable for when the treatment started
@@ -109,12 +140,12 @@ reported_DID <- reported_DID |>
   mutate(did = time*treated)
 ```
 
-```{r}
+```{r, eval = FALSE}
 reported_DID <- left_join(reported_DID, reported_population, by = c("Area", "Year"))
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 #Estimate the DID Estimator
 reported_DID$Population <- as.numeric(unlist(reported_DID$Population))
 
@@ -122,13 +153,13 @@ didreg = lm(value ~ treated + time + did + Population, data = reported_DID)
 summary(didreg)
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Export results to LaTeX (or Word)
 stargazer(didreg, type = "latex", out = "DID_results.tex")  # To export LaTeX
 # stargazer(fe_model, type = "text", out = "DID_results.txt")  # To export text
 ```
 
-```{r}
+```{r, eval = FALSE}
 # DID analysis - using CPD reported Crime Rate for population
 reported_rate_DID <- Illinois_Crime_Stats |>
   filter(Year != 2020) |>
@@ -138,7 +169,7 @@ reported_rate_DID <- Illinois_Crime_Stats |>
   select(Year, Non_Chicago_CrimePer, Chicago_CrimePer)
 ```
 
-```{r}
+```{r, eval = FALSE}
 reported_rate_DID <- reported_rate_DID |>
   pivot_longer(cols = c(Non_Chicago_CrimePer, Chicago_CrimePer), names_to = "Area") |>
   #create a dummy variable for when the treatment started
@@ -149,12 +180,12 @@ reported_rate_DID <- reported_rate_DID |>
   mutate(did = time*treated)
 ```
 
-```{r}
+```{r, eval = FALSE}
 didreg_rate = lm(value ~ treated + time + did, data = reported_rate_DID)
 summary(didreg_rate)
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Export results to LaTeX (or Word)
 stargazer(didreg_rate, type = "latex", out = "DID_results.tex")  # To export LaTeX
 # stargazer(fe_model, type = "text", out = "DID_results.txt")  # To export text

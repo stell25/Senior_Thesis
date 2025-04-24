@@ -35,6 +35,8 @@ IUCR_Codes <- read.csv(file.path(file_path,"Raw Data", "Chicago_Police_Departmen
 #load in District Population Dataset
 District_Population_Ethnicity <- read.csv(file.path(file_path,"Cleaned Data", "District Population and Ethnicity.csv"))
 
+
+
 Crimes_2010_Present_TIC <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "IUCR") |>
   filter(Year < 2020) |>
   filter(INDEX.CODE == "I")
@@ -44,13 +46,13 @@ Crimes_2010_Present_TIC <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "I
 --------------------------------------------------------------------------------
 #District Breakdown
 
-```{r}
+```{r, eval = FALSE}
 #Add a Boolean that signifies if the reported incident was a violent crime
 Crimes_2010_Present <- left_join(Crimes_2010_to_Present, IUCR_Codes, by = "IUCR") |>
   filter(Year < 2020)
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Creates Total Crime Count for Each district from 2010-2019
 District_Crime_Level_Year <- Crimes_2010_Present |>
   group_by(District, Year) |>
@@ -59,7 +61,7 @@ District_Crime_Level_Year <- Crimes_2010_Present |>
             Arrests = sum(Arrest == 'false', na.rm = TRUE))
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Create TIC counts for Each District from 2010-2019
 Year_District_Crimes_TIC <- Crimes_2010_Present |>
   #INDEX.CODE (from the IUCR) dataset indicates if crimes are used in TIC Count
@@ -71,7 +73,7 @@ Year_District_Crimes_TIC <- Crimes_2010_Present |>
     Arrests = sum(Arrest == TRUE, na.rm = TRUE))
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Join Total Crime Counts and Total Index Crime
 left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c("District", "Year")) |>
   select(District, Year, TIC) |>
@@ -82,7 +84,7 @@ write.csv(left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c(
   select(District, Year, TIC), file = "District_TIC_byYear.csv")
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Join Total Crime Counts and Total Index Crime
 Year_District_Crimes_TIC |>
   select(District, Year, TIC) |>
@@ -93,7 +95,7 @@ write.csv(left_join(District_Crime_Level_Year, Year_District_Crimes_TIC, by = c(
   select(District, Year, Total_Crime, TIC), file = "District_TIC_byYear.csv")
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Creates a Crime per 1000 Rate Column
 Year_District_Crimes_TIC <- Year_District_Crimes_TIC %>%
   mutate(District = as.integer(District))
@@ -104,7 +106,7 @@ District_population <- left_join(Year_District_Crimes_TIC, District_Population_E
 write.csv(District_population, "District_level.csv")
 ```
 
-```{r}
+```{r, eval = FALSE}
 District_population |>
   filter(District != 31) |>
   pivot_longer(cols = c(Crime_per_1000, TIC), names_to = 'Type', values_to = 'Count') |>
@@ -113,7 +115,7 @@ District_population |>
   facet_wrap(~ District)
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Averages Total Crime and Total Index Crime across 2010-2019 for each district
 District_population |>
   group_by(District) |>
@@ -122,7 +124,7 @@ District_population |>
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 library(knitr)
 kable((District_population |>
   group_by(District) |>
@@ -130,7 +132,7 @@ kable((District_population |>
             Average_Crimeper1000 = mean(Crime_per_1000))), format = "latex", digits = 2, caption = "Average Crime by District")
 ```
 
-```{r}
+```{r, eval = FALSE}
 ggplot(District_population, aes(x = Year, y = Violent, color = factor(District))) +
   geom_line() +
   geom_point(size = 0.5) +
@@ -143,7 +145,7 @@ ggplot(District_population, aes(x = Year, y = Violent, color = factor(District))
   theme_minimal()
 ```
 
-```{r}
+```{r, eval = FALSE}
 (District_population |>
   group_by(District) |>
   summarise(Average_Crime = mean(`TIC`),
@@ -163,7 +165,7 @@ ggplot(District_population, aes(x = Year, y = Crime_per_1000, color = factor(Dis
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 Year_Crimes <- Crimes_2010_Present |>
   group_by(Year) |>
   summarise(Total_Crime = n(),
@@ -173,7 +175,7 @@ Year_Crimes <- Crimes_2010_Present |>
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 Year_Crimes_NOT <- Crimes_2010_Present |>
   filter(District != 31) |>
   filter(!`Primary Type` %in% c("HOMICIDE", "CRIMINAL SEXUAL ASSAULT", "ROBBERY", 
@@ -189,7 +191,7 @@ Year_Crimes_NOT <- Crimes_2010_Present |>
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 District_Crime_Level <- Crimes_2010_Present |>
   group_by(District) |>
   summarise(Violent = sum(Violent == 1, na.rm = TRUE),
@@ -206,14 +208,14 @@ District_Crime_Level <- Crimes_2010_Present |>
 
 ```
 
-```{r}
+```{r, eval = FALSE}
 District_Crime_Level_Year$Year <- as.numeric(District_Crime_Level_Year$Year)
 District_Crime_Level_Year$District <- as.factor(District_Crime_Level_Year$District)
 library(viridis)
 library(ggrepel)
 ```
 
-```{r}
+```{r, eval = FALSE}
 ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) +
   geom_line() +
   geom_point(size = 0.5) +
@@ -227,7 +229,7 @@ ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) 
   theme_minimal()
 ```
 
-```{r}
+```{r, eval = FALSE}
 top_3 <- District_Crime_Level_Year %>%
   filter(Year == 2020) %>%
   arrange(desc(Violent)) %>%
@@ -246,11 +248,11 @@ ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) 
   theme_minimal()
 ```
 
-```{r}
+```{r, eval = FALSE}
 #Strategic_Subject_List_Historical <- read_csv("~/2025 Spring/Thesis/Strategic_Subject_List_-_Historical_20241107.csv")
 ```
 
-```{r}
+```{r, eval = FALSE}
 
 #left_join(SSL_District, SSL_top50)
 
@@ -268,40 +270,40 @@ ggplot(District_Crime_Level_Year, aes(x = Year, y = Violent, color = District)) 
 ----------------------------
 #District Map
 
-```{r}
+```{r, eval = FALSE}
 District_Summaries <- District_population |>
   group_by(District) |>
   summarise(TIC = mean(TIC),
             Crime_per_1000 = mean(Crime_per_1000))
 ```
 
-```{r}
+```{r, eval = FALSE}
 PoliceDistrictBoundaries_Current <- read_csv(file.path(file_path, "Shapefiles",  "PoliceDistrictBoundaries_Current.csv"))
 ```
-```{r}
+```{r, eval = FALSE}
 PoliceDistrictBoundaries_Current <- read_sf(file.path(file_path, "Shapefiles",  "PoliceDistrictBoundaries_Current.csv"))
 ```
 
-```{r}
+```{r, eval = FALSE}
 PoliceDistrictBoundaries_Current <- PoliceDistrictBoundaries_Current |>
   rename(geometry = the_geom,
          District = DIST_NUM) |>
   select(geometry, District)
 ```
 
-```{r}
+```{r, eval = FALSE}
 PoliceDistrictBoundaries_Current <- st_as_sf(PoliceDistrictBoundaries_Current, wkt = "geometry")
 
 PoliceDistrictBoundaries_Current$District <- as.integer(PoliceDistrictBoundaries_Current$District)
 ```
 
-```{r}
+```{r, eval = FALSE}
 ggplot(data = PoliceDistrictBoundaries_Current) +
   geom_sf(aes(geometry = geometry)) +
   labs(title = "Police District Boundaries")
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Create breaks
 breaks <- classIntervals(District_Summaries$Crime_per_1000, n = 5, style = "jenks")$brks
 breaks <- breaks[2:6]
@@ -317,7 +319,7 @@ merged <- left_join(PoliceDistrictBoundaries_Current, District_Summaries, by = "
 centroids <- st_centroid(merged)
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Font setup
 theme_set(theme_bw(base_family = "Cambria"))
 
@@ -328,13 +330,13 @@ merged$Crime_bin <- factor(
   labels = c("Low (Less than 40 TIC)", "Moderate (40-65 TIC)", "High (65-90 TIC)", "Very High (Over 90 TIC)")
 )
 
-p4 <- c("Low (Less than 40 TIC)" = "#4DD588",
+p4 <- c("Low (Less than 40 TIC)" = "#59c64e",
         "Moderate (40-65 TIC)" = "#fee08b",
         "High (65-90 TIC)" = "#f6bb90",
         "Very High (Over 90 TIC)" = "#E94E46")
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Plot
 plot <- ggplot(merged) +
   geom_sf(aes(fill = Crime_bin), color = "white", size = 0.3) +
@@ -349,9 +351,10 @@ plot <- ggplot(merged) +
     values = p4,
     name = "Crime Rate"
   ) +
-  labs(title = "Map of Chicago Districts and Crime Rate per 1,000") +
+  labs(title = "Map of Chicago Districts and Crime Rate per 1,000") #+
   #theme_bw(base_family = "Cambria") +
-  theme(
+  
+  #theme(
     legend.title = element_text(size = 16, face = "bold"),
     legend.text = element_text(size = 14),
     plot.title = element_text(size = 20, face = "bold"),
@@ -366,7 +369,7 @@ ggsave("Chicago_Districts_and_Crime_Rate.png",
        height = 3)
 ```
 
-```{r}
+```{r, eval = FALSE}
 # Merge with spatial, no bins
 merged2 <- left_join(PoliceDistrictBoundaries_Current, District_Summaries, by = "District")
 
@@ -374,7 +377,7 @@ merged2 <- left_join(PoliceDistrictBoundaries_Current, District_Summaries, by = 
 centroids <- st_centroid(merged2)
 ```
 
-```{r}
+```{r, eval = FALSE}
 theme_set(theme_bw(base_family = "Cambria"))
 
 # Plot
@@ -385,7 +388,7 @@ theme_set(theme_bw(base_family = "Cambria"))
     data = centroids,
     aes(label = District, geometry = geometry),
     stat = "sf_coordinates",
-    size = 4,
+    size = 3,
     color = "black"
   ) +
 scale_fill_gradientn(
@@ -396,13 +399,21 @@ scale_fill_gradientn(
 ) +
   labs(title = "Map of Chicago Districts and Crime Rate per 1,000") +
   theme(
-    legend.title = element_text(size = 16, face = "bold"),
-    legend.text = element_text(size = 14),
-    plot.title = element_text(size = 20, face = "bold"),
+    legend.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
     axis.text = element_blank(),
     axis.ticks = element_blank(),
     axis.title = element_blank()
   )
+    
+#  theme(
+#    legend.title = element_text(size = 16, face = "bold"),
+#    legend.text = element_text(size = 14),
+#    plot.title = element_text(size = 20, face = "bold"),
+#    axis.text = element_blank(),
+#   axis.ticks = element_blank(),
+#    axis.title = element_blank()
+#  )
 
 #ggsave("Chicago_Districts_and_Crime_Rate.png", 
 #       plot = plot,
@@ -413,7 +424,7 @@ scale_fill_gradientn(
 
 -----------------
 #Year Breakdown
-```{r}
+```{r, eval = FALSE}
 Year_Crimes <- Crimes_2010_Present |>
   group_by(Year) |>
   summarise(Violent = sum(Violent == 1, na.rm = TRUE),
@@ -427,27 +438,30 @@ Year_Crimes <- Crimes_2010_Present |>
   mutate(z_scores = Violent_Z + Arrests_Z)
 ```
 
-```{r}
+```{r, eval = FALSE}
 overall_trend <- District_population |>
   group_by(Year) |>
   summarise(mean = mean(Crime_per_1000))
 
 ggplot(District_population, aes(x = Year, y = Crime_per_1000, group = District)) +
-  geom_line(color = "#0072B2", size = 0.7) +  # Clear blue for all district lines
+  geom_line(color = "#0072B2", size = 1) +  # Clear blue for all district lines
   geom_line(
     data = overall_trend,
     aes(x = Year, y = mean),
     inherit.aes = FALSE,
     color = "black",
     linetype = "dashed",
-    size = 0.7
+    size = 1
   ) +  # Dotted black line for overall trend
-  facet_wrap(~ District, ncol = 3) +
+  scale_x_continuous(breaks = seq(2010, 2020, by = 2))+
+  facet_wrap(~ District, ncol = 4) +
   labs(
     title = "Crime Rates per 1,000 by District",
     x = "Year",
     y = "Crime per 1,000"
-  ) +
+  )
+
++
   theme(
     plot.title = element_text(size = 20, face = "bold"),
     axis.text = element_text(size = 15, face = "bold"),
@@ -464,14 +478,15 @@ ggplot(District_population, aes(x = Year, y = Crime_per_1000, group = District))
 #District - Arrest Ratios
 --------------------------------------
 
-```{r}
+```{r, eval = FALSE}
 Crimes_2010_Present_TIC |>
   group_by(Year, District) |>
   summarise(Violent = sum(Violent == "1", na.rm = TRUE),
             Arrests = sum(Arrest == 'TRUE', na.rm = TRUE),
             Crime_to_Arrest_Ratio = Violent / Arrests)
 ```
-```{r}
+
+```{r, eval = FALSE}
 Crimes_2010_Present_TIC |>
   filter(INDEX.CODE == "I") |>
   group_by(Year, District) |>
@@ -485,7 +500,7 @@ Crimes_2010_Present_TIC |>
 #A higher value means fewer arrests relative to crime (i.e., more crimes happen before an arrest is made). A lower value means more arrests relative to crime (i.e., fewer crimes per arrest).
 ```
 
-```{r}
+```{r, eval = FALSE}
 
 TIC_arrests_ratio <- Crimes_2010_Present_TIC |>
   filter(INDEX.CODE == "I") |>
@@ -507,15 +522,48 @@ ggplot(TIC_arrests_ratio, aes(x = Year, y = factor(District), fill = Crime_to_Ar
   theme_minimal() +
   labs(title = "Crime to Arrest Ratio Heatmap",
        x = "Year",
-       y = "District")
+       y = "District") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12)
+  )
 
+```
+```{r}
+overall_trend_arrest_ratio <- TIC_arrests_ratio |>
+  group_by(Year) |>
+  summarise(mean = mean(Crime_to_Arrest_Ratio))
+
+#TIC_arrests_ratio
+
+TIC_arrests_ratio$District <- as.numeric(TIC_arrests_ratio$District)
+  
+
+ggplot(TIC_arrests_ratio, aes(x = Year, y = Crime_to_Arrest_Ratio, group = District)) +
+  geom_line(color = "#0072B2", size = 1) +  # Clear blue for all district lines
+  geom_line(
+    data = overall_trend_arrest_ratio,
+    aes(x = Year, y = mean),
+    inherit.aes = FALSE,
+    color = "black",
+    linetype = "dashed",
+    size = 1
+  ) +  # Dotted black line for overall trend
+  scale_x_continuous(breaks = seq(2010, 2020, by = 2))+
+  facet_wrap(~ District, ncol = 4) +
+  labs(
+    title = "TIC Crime to Arrest Ratio",
+    x = "Year",
+    y = "Crime to Arrest Ratio"
+  )
 ```
 
 --------------------------------------
 #COPA Complaints
 --------------------------------------
 
-```{r}
+```{r, eval = FALSE}
 #COPA COMPLAINTS
 
 COPA_Cases_._By_Involved_Officer_20241120 <- read_csv(file.path(file_path,"Raw Data", "COPA_Cases_-_By_Involved_Officer_20241120.csv"))
@@ -523,13 +571,13 @@ COPA_Cases_._By_Involved_Officer_20241120 <- read_csv(file.path(file_path,"Raw D
 BIA_Cases_By_Involved_Officer <- read_csv(file.path(file_path,"Raw Data", "BIA_Cases_-_By_Involved_Officer_20250327.csv"))
 ```
 
-```{r}
+```{r, eval = FALSE}
 COPA_Cases_._By_Involved_Officer_20241120 |>
   mutate(COMPLAINT_DATE = as.POSIXct(COMPLAINT_DATE, format = "%m/%d/%Y %I:%M:%S %p")) |>
   filter(COMPLAINT_DATE > 01/01/2010)
 ```
 
-```{r}
+```{r, eval = FALSE}
 COPA_BIA_complaints <- left_join(COPA_Cases_._By_Involved_Officer_20241120, BIA_Cases_By_Involved_Officer, by = "LOG_NO") |>
    mutate(across(where(is.character), ~ na_if(.x, ""))) |>
   #combine columns
@@ -573,7 +621,7 @@ COPA_BIA_complaints <- left_join(COPA_Cases_._By_Involved_Officer_20241120, BIA_
 #37370 after filtering out rest of non loggable beats
 ```
 
-```{r}
+```{r, eval = FALSE}
 test <- COPA_BIA_complaints |>
   group_by(DISTRICT, COMPLAINT_YEAR) |>
   summarise(count = n())
@@ -585,7 +633,7 @@ test <- test |>
   select(DISTRICT, COMPLAINT_YEAR, Count)
 ```
 
-```{r}
+```{r, eval = FALSE}
 
 #Overall median of complaints for each district: 1289
 #Overall mean of complaints for each district: 1384
@@ -599,7 +647,7 @@ COPA_BIA_complaints_counts |>
   summarize(median = median(Count))
 ```
 
-```{r}
+```{r, eval = FALSE}
 district_levels_1 <- c("All", "01", "02", "03", "04", "05")
 
 rbind(COPA_BIA_complaints_counts, test) |>
@@ -648,7 +696,7 @@ rbind(COPA_BIA_complaints_counts, test) |>
   )
 ```
 
-```{r}
+```{r, eval = FALSE}
 district_levels_2 <- c("All", "06", "07", "08", "09", "10", "11")
 
 rbind(COPA_BIA_complaints_counts, test) |>
@@ -700,7 +748,7 @@ scale_linetype_manual(
 
 ```
 
-```{r}
+```{r, eval = FALSE}
 district_levels_3 <- c("All", "12", "14", "15", "16", "17", "18")
 
 rbind(COPA_BIA_complaints_counts, test) |>
@@ -751,7 +799,7 @@ scale_linetype_manual(
   )
 ```
 
-```{r}
+```{r, eval = FALSE}
 district_levels_4 <- c("All", "19", "20", "22", "24", "25", "31")
 
 rbind(COPA_BIA_complaints_counts, test) |>
@@ -803,7 +851,7 @@ scale_linetype_manual(
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 COPA_BIA_complaints |>
   #filters out na cases (42477 of the entries, 52%)
   filter(!is.na(CASE_TYPE)) |>

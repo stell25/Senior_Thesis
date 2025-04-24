@@ -37,7 +37,6 @@ Strategic_Subject_List_Historical <- Strategic_Subject_List_Historical |>
   mutate(District = ifelse((District == 21), 2, District)) |>
   #consolidate district 23 into 19
   mutate(District = ifelse((District == 23), 19, District)) 
-
 ```
 
 ----------------------
@@ -59,38 +58,6 @@ write.csv(SSL_stats, "SSL_stats.csv")
 Strategic_Subject_List_Historical |>
   summarise(min = min(`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`),
             max = max(`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`))
-```
-```{r}
-#252670 have a majority dist
-#141973	have a majority district that doesn't match their district of residence
-Strategic_Subject_List_Historical |>
-  filter(!is.na(`MAJORITY DIST`)) |>
-  #filter to individuals where majority district doesn't match up with district on file
-  filter(`MAJORITY DIST` != District) |>
-  group_by(`MAJORITY DIST`) |>
-  summarise(count = n())
-
-Strategic_Subject_List_Historical |>
-  filter(!is.na(`MAJORITY DIST`)) |>
-  #filter to individuals where majority district doesn't match up with district on file
-  filter(`MAJORITY DIST` != District) |>
-  group_by(District) |>
-  summarise(count = n())
-  
-Strategic_Subject_List_Historical |>
-  filter(!is.na(`MAJORITY DIST`)) |>
-  #filter to individuals where majority district doesn't match up with district on file
-  filter(`MAJORITY DIST` != District) |>
-  group_by(`MAJORITY DIST`, District) |>
-  summarise(count = n())
-```
-```{r}
-Strategic_Subject_List_Historical |>
-  filter(!is.na(`MAJORITY DIST`)) |>
-  #filter to individuals where majority district doesn't match up with district on file
-  filter(`MAJORITY DIST` != District) |>
-  group_by(`MAJORITY DIST`, District) |>
-  summarise(count = n())
 ```
 
 ----------------------
@@ -119,6 +86,22 @@ SSL_top20 <- Strategic_Subject_List_Historical |>
 ```
 
 ```{r}
+#Add a boolean to the full Dataset that signifies whether an individual was in the top 20
+# Save the District + HEAT SCORE combos
+Top20_keys <- SSL_top20 |>
+  select(District, `HEAT SCORE`)
+
+# Flag in the full dataset
+Strategic_Subject_List_Historical <- Strategic_Subject_List_Historical |>
+  mutate(in_top20 = (paste(District, `HEAT SCORE`) %in% 
+                     paste(Top20_keys$District, Top20_keys$`HEAT SCORE`)))
+
+Strategic_Subject_List_Historical_non_Top_20 <- Strategic_Subject_List_Historical |>
+  filter(in_top20 == FALSE)
+
+```
+
+```{r}
 # Step 1: Prepare data
 
 plot_data <- SSL_top20 |>
@@ -138,12 +121,11 @@ Heat_Score_Distribution <- ggplot(plot_data, aes(y = label, x = `HEAT SCORE`, co
   scale_color_manual(values = palette_30)+
   #scale_color_viridis_d(option = "C", direction = -1) +
   theme_bw() +
-  theme(legend.position = "none",
-        plot.title = element_text(size = 20, face = "bold"),
-        axis.text = element_text(size = 14),
-        axis.title = element_text(size = 16, face = "bold")) +  
   geom_vline(xintercept = median(plot_data$`HEAT SCORE`, na.rm = TRUE), lty = "dashed") +
-  labs(x = "HEAT SCORE", y = "Police District (N)", title = "Distribution of HEAT SCORE by Police District")
+  labs(x = "HEAT SCORE", y = "Police District (N)", title = "Distribution of HEAT SCORE by Police District") +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold"),
+        axis.title = element_text(face = "bold")) +  
 
 ggsave("Heat_Score_Distribution.png", 
        plot = Heat_Score_Distribution,
@@ -160,6 +142,55 @@ District_population |>
   summarise(TIC = mean(TIC),
             Crime_per_1000 = mean(Crime_per_1000))
 ```
+---------------
+#Majority
+----------------
+
+```{r}
+#252670 have a majority dist
+#141973	have a majority district that doesn't match their district of residence
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(`MAJORITY DIST`) |>
+  summarise(count = n())
+
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(District) |>
+  summarise(count = n())
+  
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(`MAJORITY DIST`, District) |>
+  summarise(count = n())
+```
+
+```{r}
+Strategic_Subject_List_Historical |>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(`MAJORITY DIST`, District) |>
+  summarise(count = n())
+```
+
+```{r}
+Strategic_Subject_List_Historical|>
+  filter(!is.na(`MAJORITY DIST`)) |>
+  #filter to individuals where majority district doesn't match up with district on file
+  filter(`MAJORITY DIST` != District) |>
+  group_by(`MAJORITY DIST`, District) |>
+  filter(District == 31) |>
+  summarise(count = n())
+```
+
+
 -----------------
 #SSL FLAGS - interactions with Police Units
 ------------------
@@ -203,10 +234,249 @@ Strategic_Subject_List_Historical |>
   )
 ```
 
----------------------
-#Predictors
----------------------
 ```{r}
-
+SSL_top20 |>
+  group_by(`SEX CODE CD`) |>
+  summarize(count = n())
 ```
+
+```{r}
+Strategic_Subject_List_Historical |>
+  group_by(`SEX CODE CD`) |>
+  summarize(count = n())
+```
+
+
+
+---------------------
+#TOP 20 SSL Predictors
+---------------------
+```{r Age at latest}
+SSL_top20 |>
+  group_by(`PREDICTOR RAT AGE AT LATEST ARREST`) |>
+  summarise(Count = n()) |>
+  mutate(prop = Count/sum(Count))
+```
+```{r Current}
+SSL_top20 |>
+  group_by(`AGE CURR`) |>
+  summarise(Count = n()) |>
+  mutate(prop = Count/sum(Count))
+
+Strategic_Subject_List_Historical |>
+  group_by(`AGE CURR`) |>
+  summarise(Count = n()) |>
+  mutate(prop = Count/sum(Count))
+```
+
+```{r Race top 20}
+SSL_top20 |>
+  group_by(`RACE CODE CD`) |>
+  summarise(Count = n()) |>
+  mutate(prop = Count/sum(Count))
+```
+```{r Race full}
+Strategic_Subject_List_Historical |>
+  group_by(`RACE CODE CD`) |>
+  summarise(Count = n()) |>
+  mutate(prop = Count/sum(Count))
+```
+
+```{r Sex}
+SSL_top20 |>
+  group_by(`SEX CODE CD`) |>
+  summarise(Count = n()) |>
+  mutate(prop = Count/sum(Count))
+```
+
+```{r Num times victim of shooting top 20}
+Strategic_Subject_List_Historical |>
+  group_by(`PREDICTOR RAT VICTIM SHOOTING INCIDENTS`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Num times victim of shooting rest of dataset}
+Strategic_Subject_List_Historical_non_Top_20 |>
+  group_by(`PREDICTOR RAT VICTIM SHOOTING INCIDENTS`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Num times victim of assault top 20}
+SSL_top20 |>
+  group_by(`PREDICTOR RAT VICTIM BATTERY OR ASSAULT`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Num times victim of assault full dataset}
+Strategic_Subject_List_Historical |>
+  group_by(`PREDICTOR RAT VICTIM BATTERY OR ASSAULT`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Num Arrests Violent Offenses top 20}
+SSL_top20 |>
+  group_by(`PREDICTOR RAT ARRESTS VIOLENT OFFENSES`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Num Arrests Violent Offenses full dataset}
+Strategic_Subject_List_Historical |>
+  group_by(`PREDICTOR RAT ARRESTS VIOLENT OFFENSES`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r gang affiliation top 20}
+#boolean
+SSL_top20 |>
+  group_by(`PREDICTOR RAT GANG AFFILIATION`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r gang affiliation full dataset}
+#boolean
+Strategic_Subject_List_Historical |>
+  group_by(`PREDICTOR RAT GANG AFFILIATION`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+
+```{r Num times arrested for narcotics top 20}
+SSL_top20 |>
+  group_by(`PREDICTOR RAT NARCOTIC ARRESTS`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Num times arrested for narcotics full dataset}
+Strategic_Subject_List_Historical |>
+  group_by(`PREDICTOR RAT NARCOTIC ARRESTS`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Predictor trend in Criminal Activity}
+SSL_top20 |>
+  cut(SSL_top20$`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`, breaks = 6)
+  summarise(quantile())
+  ggplot(aes(x = `PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`, y = `SSL SCORE`)) +
+  geom_point()
+
+
+SSL_top20 |>
+  mutate(Pred_Crim = cut(`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`, 
+                        breaks = c(-10, -5, -2, 0, 2, 5, 10), 
+                        labels = c("Below -5", "[-5,-2]", "[-2,0]", "[0,2]", "[2,5]", "Above 5"),
+                        right = TRUE)) |>
+  group_by(Pred_Crim) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Predictor trend in Criminal Activity full dataset}
+Strategic_Subject_List_Historical |>
+  cut(SSL_top20$`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`, breaks = 6)
+  summarise(quantile())
+  ggplot(aes(x = `PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`, y = `SSL SCORE`)) +
+  geom_point()
+
+
+Strategic_Subject_List_Historical |>
+  mutate(Pred_Crim = cut(`PREDICTOR RAT TREND IN CRIMINAL ACTIVITY`, 
+                        breaks = c(-10, -5, -2, 0, 2, 5, 10), 
+                        labels = c("Below -5", "[-5,-2]", "[-2,0]", "[0,2]", "[2,5]", "Above 5"),
+                        right = TRUE)) |>
+  group_by(Pred_Crim) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+```{r Num of UUW Arrests top 20}
+SSL_top20 |>
+  group_by(`PREDICTOR RAT UUW ARRESTS`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+```{r Num of UUW Arrests full dataset}
+Strategic_Subject_List_Historical |>
+  group_by(`PREDICTOR RAT UUW ARRESTS`) |>
+  summarise(Count = n(),
+            Mean_Score = mean(`SSL SCORE`),
+            Max = max(`SSL SCORE`),
+            Min = min(`SSL SCORE`)) |>
+  mutate(Prop = Count/sum(Count))
+```
+
+
+```{r}
+SSL_top20 |>
+  filter(`SSL SCORE` < 500) |>
+  ggplot(aes(x = `RAW SSL SCORE`, y = `SSL SCORE`)) +
+  geom_point()
+
+(SSL_top20 |>
+  filter(`SSL SCORE` < 500))
+
+model <- lm(log(`SSL SCORE`) ~ log(`RAW SSL SCORE`), data = filter(SSL_top20, `SSL SCORE` < 500))
+
+summary(model)
+```
+```{r}
+SSL_top20 |>
+  group_by(`SSL FLAGS`) |>
+  summarize(count = n())
+
+#314 na values, 473 total
+```
+
+
+
+
+
 
